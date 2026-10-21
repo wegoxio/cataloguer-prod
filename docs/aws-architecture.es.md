@@ -29,7 +29,8 @@ Los frontends viven en Vercel. AWS aloja API, base de datos y almacenamiento par
 | Runtime | Docker 29, Compose 5, Node 22 |
 | Proxy | Caddy 2; Let’s Encrypt y renovación automática |
 | Base de datos | PostgreSQL 16 en volumen Docker privado |
-| Imágenes | `cataloguer-products-bucket` |
+| Imágenes de productos | `cataloguer-products-bucket` |
+| Imágenes de categorías | `cataloguer-category-images-420151437743` |
 | Backups | `cataloguer-private-prod-420151437743` |
 | Perfil CLI | `cataloguer-deployer` |
 | Presupuesto | `Cataloguer-Pilot-Monthly`, USD 40 |

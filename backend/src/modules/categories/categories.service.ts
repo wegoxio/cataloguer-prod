@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/postgresql';
 import { Category, MAX_CATEGORY_DEPTH } from './entities/category.entity';
@@ -535,6 +530,33 @@ export class CategoriesService {
       );
     }
 
+    return category;
+  }
+
+  async setImage(
+    scope: TenantScope | undefined,
+    id: string,
+    objectKey: string | null,
+    imageUrl: string | null,
+    actor?: { id: string; email: string },
+  ): Promise<Category> {
+    const category = await this.resolveCategory(scope, id, false);
+    const before = category.imageUrl ?? null;
+    category.imageObjectKey = objectKey;
+    category.imageUrl = imageUrl;
+    await this.categoryRepository.getEntityManager().flush();
+    if (actor && before !== imageUrl) {
+      await this.auditLogService.recordAuditEntry(
+        actor.id,
+        actor.email,
+        EntityType.CATEGORY,
+        category.id,
+        Action.UPDATE,
+        { imageUrl: { before, after: imageUrl } },
+        `${imageUrl ? 'Updated' : 'Removed'} image for category "${category.name}"`,
+        { organizationId: this.organizationIdOf(category) },
+      );
+    }
     return category;
   }
 }

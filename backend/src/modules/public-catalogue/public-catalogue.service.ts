@@ -92,20 +92,39 @@ export class PublicCatalogueService {
     channel?: string;
     placement?: string;
     group?: string;
-  }): Promise<Array<{ category_id: string; channel_key: string; public_label: string | null; sort_order: number; placements: string[]; group_keys: string[]; image_url: string | null; product_count: number }>> {
+  }): Promise<
+    Array<{
+      category_id: string;
+      channel_key: string;
+      public_label: string | null;
+      sort_order: number;
+      placements: string[];
+      group_keys: string[];
+      image_url: string | null;
+      product_count: number;
+    }>
+  > {
     const params: unknown[] = [options.organizationId, options.storeId];
     const clauses = ['cp.organization_id = ?::uuid', 'cp.store_id = ?::uuid', 'cp.visible = true', 'ch.active = true'];
-    if (options.channel) { clauses.push('ch.key = ?'); params.push(options.channel); }
-    if (options.placement) { clauses.push('cp.placements @> ?::jsonb'); params.push(JSON.stringify([options.placement])); }
+    if (options.channel) {
+      clauses.push('ch.key = ?');
+      params.push(options.channel);
+    }
+    if (options.placement) {
+      clauses.push('cp.placements @> ?::jsonb');
+      params.push(JSON.stringify([options.placement]));
+    }
     if (options.group) {
-      clauses.push(`exists (select 1 from catalogue_group_categories xgc join catalogue_groups xg on xg.id = xgc.group_id where xgc.category_id = cp.category_id and xg.channel_id = cp.channel_id and xg.active = true and xg.key = ?)`);
+      clauses.push(
+        `exists (select 1 from catalogue_group_categories xgc join catalogue_groups xg on xg.id = xgc.group_id where xgc.category_id = cp.category_id and xg.channel_id = cp.channel_id and xg.active = true and xg.key = ?)`,
+      );
       params.push(options.group);
     }
     return this.categoryRepository.getEntityManager().execute(
       `select cp.category_id, ch.key as channel_key, cp.public_label, cp.sort_order,
               cp.placements,
               coalesce(array_agg(distinct g.key) filter (where g.active = true), '{}') as group_keys,
-              img.url as image_url,
+              coalesce(category.image_url, img.url) as image_url,
               (select count(distinct p.id)::int from product_categories pc
                 join products p on p.id = pc.product_id
                 join store_products sp on sp.product_id = p.id and sp.store_id = cp.store_id and sp.published = true
@@ -113,6 +132,7 @@ export class PublicCatalogueService {
                  and p.archived_at is null and p.removed_at is null) as product_count
          from store_category_publications cp
          join catalogue_channels ch on ch.id = cp.channel_id
+         join categories category on category.id = cp.category_id
          left join catalogue_group_categories gc on gc.category_id = cp.category_id and gc.store_id = cp.store_id
          left join catalogue_groups g on g.id = gc.group_id and g.channel_id = cp.channel_id
          left join lateral (
@@ -127,13 +147,17 @@ export class PublicCatalogueService {
             order by pi.is_primary desc, pi.sort_order asc, pi.created_at asc limit 1
          ) img on true
         where ${clauses.join(' and ')}
-        group by cp.category_id, cp.store_id, cp.cover_product_id, ch.key, cp.public_label, cp.sort_order, cp.placements, img.url
+        group by cp.category_id, cp.store_id, cp.cover_product_id, category.image_url, ch.key, cp.public_label, cp.sort_order, cp.placements, img.url
         order by cp.sort_order asc, cp.category_id asc`,
       params,
     );
   }
 
-  private async channelCategoryIdsForProducts(organizationId: string, storeId: string, channel: string): Promise<string[] | null> {
+  private async channelCategoryIdsForProducts(
+    organizationId: string,
+    storeId: string,
+    channel: string,
+  ): Promise<string[] | null> {
     const rows = await this.categoryRepository.getEntityManager().execute<{ category_id: string }[]>(
       `select cp.category_id from store_category_publications cp
        join catalogue_channels ch on ch.id = cp.channel_id
@@ -143,16 +167,37 @@ export class PublicCatalogueService {
     return rows.length ? rows.map((row) => row.category_id) : null;
   }
 
-  async getGroups(options: { organizationId?: string; storeId?: string; channel?: string; purpose?: string; placement?: string }) {
+  async getGroups(options: {
+    organizationId?: string;
+    storeId?: string;
+    channel?: string;
+    purpose?: string;
+    placement?: string;
+  }) {
     if (!options.organizationId || !options.storeId) return { items: [] };
     const params: unknown[] = [options.organizationId, options.storeId];
     const clauses = ['g.organization_id = ?::uuid', 'g.store_id = ?::uuid', 'g.active = true', 'ch.active = true'];
-    if (options.channel) { clauses.push('ch.key = ?'); params.push(options.channel); }
-    if (options.purpose) { clauses.push('g.purpose = ?'); params.push(options.purpose); }
-    if (options.placement) { clauses.push('g.placements @> ?::jsonb'); params.push(JSON.stringify([options.placement])); }
+    if (options.channel) {
+      clauses.push('ch.key = ?');
+      params.push(options.channel);
+    }
+    if (options.purpose) {
+      clauses.push('g.purpose = ?');
+      params.push(options.purpose);
+    }
+    if (options.placement) {
+      clauses.push('g.placements @> ?::jsonb');
+      params.push(JSON.stringify([options.placement]));
+    }
     const rows = await this.categoryRepository.getEntityManager().execute<any[]>(
       `select g.id, g.key, g.name, g.description, g.purpose, g.placements, g.sort_order, ch.key as channel_key,
-              img.url as image_url,
+              coalesce((
+                select c2.image_url from catalogue_group_categories gc2
+                join categories c2 on c2.id = gc2.category_id
+                where gc2.group_id = g.id and c2.image_url is not null
+                  and c2.archived_at is null and c2.removed_at is null
+                order by gc2.sort_order, c2.name, c2.id limit 1
+              ), img.url) as image_url,
               coalesce(array_agg(c.id order by gc.sort_order) filter (where c.id is not null), '{}') as category_ids,
               coalesce(array_agg(c.slug order by gc.sort_order) filter (where c.id is not null), '{}') as category_slugs,
               count(distinct sp.product_id)::int as product_count
@@ -179,10 +224,30 @@ export class PublicCatalogueService {
         group by g.id, ch.key, img.url order by g.sort_order, g.name, g.id`,
       params,
     );
-    return { items: rows.map((row) => ({ id: row.id, key: row.key, name: row.name, description: row.description, purpose: row.purpose, placements: row.placements, sortOrder: row.sort_order, channelKey: row.channel_key, imageUrl: row.image_url, categoryIds: row.category_ids, categorySlugs: row.category_slugs, productCount: Number(row.product_count) })) };
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        description: row.description,
+        purpose: row.purpose,
+        placements: row.placements,
+        sortOrder: row.sort_order,
+        channelKey: row.channel_key,
+        imageUrl: row.image_url,
+        categoryIds: row.category_ids,
+        categorySlugs: row.category_slugs,
+        productCount: Number(row.product_count),
+      })),
+    };
   }
 
-  private async groupCategoryIdsForProducts(organizationId: string, storeId: string, channel: string | undefined, group: string): Promise<string[] | null> {
+  private async groupCategoryIdsForProducts(
+    organizationId: string,
+    storeId: string,
+    channel: string | undefined,
+    group: string,
+  ): Promise<string[] | null> {
     const params: unknown[] = [organizationId, storeId, group];
     const channelClause = channel ? 'and ch.key = ?' : '';
     if (channel) params.push(channel);
@@ -225,7 +290,7 @@ export class PublicCatalogueService {
     const where: Record<string, unknown> = { organization: organizationId };
 
     const rows = await this.categoryRepository.find(where as never, {
-      fields: ['id', 'parentCategory', 'name', 'slug', 'publicLabel', 'sortOrder', 'archivedAt'] as never,
+      fields: ['id', 'parentCategory', 'name', 'slug', 'publicLabel', 'imageUrl', 'sortOrder', 'archivedAt'] as never,
     });
 
     const index = new Map<string, CategoryNode>();
@@ -370,7 +435,14 @@ export class PublicCatalogueService {
         group: options.group,
       });
       const pageRows = publicationRows.slice(offset, offset + limit);
-      if (!pageRows.length) return { items: [], total: publicationRows.length, page, limit, totalPages: Math.ceil(publicationRows.length / limit) };
+      if (!pageRows.length)
+        return {
+          items: [],
+          total: publicationRows.length,
+          page,
+          limit,
+          totalPages: Math.ceil(publicationRows.length / limit),
+        };
       where.id = { $in: pageRows.map((row) => row.category_id) };
       offset = 0;
     } else if (options?.storeId) {
@@ -413,7 +485,11 @@ export class PublicCatalogueService {
     });
     const publicationById = new Map((publicationRows ?? []).map((row) => [row.category_id, row]));
     const categories = publicationRows
-      ? [...foundCategories].sort((a, b) => publicationRows!.findIndex((row) => row.category_id === a.id) - publicationRows!.findIndex((row) => row.category_id === b.id))
+      ? [...foundCategories].sort(
+          (a, b) =>
+            publicationRows!.findIndex((row) => row.category_id === a.id) -
+            publicationRows!.findIndex((row) => row.category_id === b.id),
+        )
       : foundCategories;
     const total = publicationRows?.length ?? legacyTotal;
 
@@ -868,7 +944,8 @@ export class PublicCatalogueService {
     andClauses.splice(categoryClauseIndex >= 0 ? categoryClauseIndex : andClauses.length, 0, { parent: null });
 
     if (options) {
-      const { minPrice, maxPrice, hasSalePrice, search, mfgCode, categorySlug, inStock, specs, channel, group } = options;
+      const { minPrice, maxPrice, hasSalePrice, search, mfgCode, categorySlug, inStock, specs, channel, group } =
+        options;
 
       if (channel !== undefined) {
         if (!options.storeId || !options.organizationId) return { items: [], total: 0, page, limit, totalPages: 0 };
@@ -878,7 +955,12 @@ export class PublicCatalogueService {
       }
       if (group !== undefined) {
         if (!options.storeId || !options.organizationId) return { items: [], total: 0, page, limit, totalPages: 0 };
-        const groupCategoryIds = await this.groupCategoryIdsForProducts(options.organizationId, options.storeId, channel, group);
+        const groupCategoryIds = await this.groupCategoryIdsForProducts(
+          options.organizationId,
+          options.storeId,
+          channel,
+          group,
+        );
         if (!groupCategoryIds) return { items: [], total: 0, page, limit, totalPages: 0 };
         andClauses.push({ categories: { id: { $in: groupCategoryIds } } });
       }
@@ -893,10 +975,7 @@ export class PublicCatalogueService {
         const visibleChild = this.visibleChildWhere(options);
         if (hasSalePrice) {
           andClauses.push({
-            $or: [
-              { salePrice: { $ne: null } },
-              { children: { $some: { salePrice: { $ne: null }, ...visibleChild } } },
-            ],
+            $or: [{ salePrice: { $ne: null } }, { children: { $some: { salePrice: { $ne: null }, ...visibleChild } } }],
           });
         } else {
           andClauses.push({
@@ -1329,9 +1408,9 @@ export class PublicCatalogueService {
     return new Map(rows.map((row) => [row.product_id, Number(row.available)]));
   }
 
-        // The library's own recorded type — the trusted fact.
-            // The child's own row for the same file wins, whether it
-            // overrides the document or suppresses it outright.
+  // The library's own recorded type — the trusted fact.
+  // The child's own row for the same file wins, whether it
+  // overrides the document or suppresses it outright.
   /**
    * Public suggestions per product.
    *

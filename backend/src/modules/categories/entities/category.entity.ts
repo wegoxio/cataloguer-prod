@@ -124,6 +124,14 @@ export class Category {
   @Property({ default: true })
   showInNavigation: boolean = true;
 
+  /** Public URL of the category's own storefront image. */
+  @Property({ nullable: true, length: 2048 })
+  imageUrl?: string | null;
+
+  /** Canonical key in the category-image bucket; URLs can change, keys do not. */
+  @Property({ nullable: true, length: 512 })
+  imageObjectKey?: string | null;
+
   /**
    * The category's picture, LINKED from the company's asset library — never
    * copied. A brand's logo is simply the image of its BRAND category.
@@ -157,10 +165,7 @@ export class Category {
   // Written only by the removal/restoration service, under the organization
   // access lock, the row lock and the lifecycle lock. Nothing else sets them.
 
-
-
   /** The remover's email AS RECORDED AT THE TIME. Never rewritten. */
-
 
   /**
    * WHAT REMOVAL RELEASED, so restoration can re-check it — and nothing else.

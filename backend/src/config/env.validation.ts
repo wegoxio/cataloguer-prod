@@ -78,6 +78,17 @@ class EnvironmentVariables {
   @IsOptional()
   STORAGE_SECRET_ACCESS_KEY?: string;
 
+  @IsString()
+  @IsOptional()
+  CATEGORY_STORAGE_BUCKET?: string;
+
+  @ValidateIf((o) => o.CATEGORY_STORAGE_PUBLIC_URL !== undefined && o.CATEGORY_STORAGE_PUBLIC_URL !== '')
+  @IsUrl(
+    { protocols: ['http', 'https'], require_protocol: true, require_tld: false },
+    { message: 'CATEGORY_STORAGE_PUBLIC_URL must be an http(s) URL' },
+  )
+  CATEGORY_STORAGE_PUBLIC_URL?: string;
+
   // Email (Resend) + reset-link base — optional; unconfigured = emails dropped with a log
   @IsString()
   @IsOptional()

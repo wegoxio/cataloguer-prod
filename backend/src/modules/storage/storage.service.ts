@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import { resolveUploadContentType, UNSUPPORTED_UPLOAD_TYPE_MESSAGE } from './policy/storage-url.policy';
@@ -32,6 +32,7 @@ export interface UploadTicket {
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
   private client: S3Client | null = null;
+  private categoryClient: S3Client | null = null;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -47,6 +48,15 @@ export class StorageService {
     return Boolean(
       this.bucket &&
       this.publicBaseUrl &&
+      this.configService.get<string>('STORAGE_ACCESS_KEY_ID') &&
+      this.configService.get<string>('STORAGE_SECRET_ACCESS_KEY'),
+    );
+  }
+
+  get isCategoryStorageConfigured(): boolean {
+    return Boolean(
+      this.configService.get<string>('CATEGORY_STORAGE_BUCKET') &&
+      this.configService.get<string>('CATEGORY_STORAGE_PUBLIC_URL') &&
       this.configService.get<string>('STORAGE_ACCESS_KEY_ID') &&
       this.configService.get<string>('STORAGE_SECRET_ACCESS_KEY'),
     );
@@ -107,6 +117,85 @@ export class StorageService {
 
     const path = `products/${productId}/${randomUUID()}.${resolved.extension}`;
     return this.signPut(path, resolved.contentType, sizeBytes);
+  }
+
+  async createCategoryUploadTicket(
+    categoryId: string,
+    extension: string | undefined,
+    sizeBytes: number,
+  ): Promise<UploadTicket> {
+    const resolved = resolveUploadContentType(extension, ['image'], 'webp');
+    if (!resolved) throw new BadRequestException(UNSUPPORTED_UPLOAD_TYPE_MESSAGE);
+    if (!Number.isInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_IMAGE_BYTES) {
+      throw new BadRequestException(`Image size must be between 1 and ${MAX_IMAGE_BYTES} bytes (got ${sizeBytes})`);
+    }
+    return this.signCategoryPut(
+      `categories/${categoryId}/${randomUUID()}.${resolved.extension}`,
+      resolved.contentType,
+      sizeBytes,
+    );
+  }
+
+  async categoryPublicUrl(categoryId: string, objectKey: string): Promise<string> {
+    if (!objectKey.startsWith(`categories/${categoryId}/`) || !/\.(?:avif|gif|jpe?g|png|webp)$/i.test(objectKey)) {
+      throw new BadRequestException('Invalid category image key');
+    }
+    try {
+      await this.getCategoryClient().send(
+        new HeadObjectCommand({
+          Bucket: this.configService.get<string>('CATEGORY_STORAGE_BUCKET')!,
+          Key: objectKey,
+        }),
+      );
+    } catch {
+      throw new BadRequestException('The category image upload was not found');
+    }
+    const base = this.configService.get<string>('CATEGORY_STORAGE_PUBLIC_URL')!.replace(/\/+$/, '');
+    return `${base}/${objectKey}`;
+  }
+
+  private getCategoryClient(): S3Client {
+    if (!this.isCategoryStorageConfigured) {
+      throw new ServiceUnavailableException('Category image storage is not configured');
+    }
+    if (!this.categoryClient) {
+      const endpoint = this.configService.get<string>('STORAGE_ENDPOINT');
+      this.categoryClient = new S3Client({
+        region: this.configService.get<string>('STORAGE_REGION') || 'auto',
+        ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+        credentials: {
+          accessKeyId: this.configService.get<string>('STORAGE_ACCESS_KEY_ID')!,
+          secretAccessKey: this.configService.get<string>('STORAGE_SECRET_ACCESS_KEY')!,
+        },
+      });
+    }
+    return this.categoryClient;
+  }
+
+  private async signCategoryPut(path: string, contentType: string, sizeBytes: number): Promise<UploadTicket> {
+    try {
+      const command = new PutObjectCommand({
+        Bucket: this.configService.get<string>('CATEGORY_STORAGE_BUCKET')!,
+        Key: path,
+        ContentType: contentType,
+        ContentLength: sizeBytes,
+      });
+      const url = await getSignedUrl(this.getCategoryClient(), command, {
+        expiresIn: UPLOAD_URL_TTL_SECONDS,
+        unhoistableHeaders: new Set(['content-type', 'content-length']),
+      });
+      const base = this.configService.get<string>('CATEGORY_STORAGE_PUBLIC_URL')!.replace(/\/+$/, '');
+      return {
+        path,
+        url,
+        headers: { 'Content-Type': contentType, 'Content-Length': String(sizeBytes) },
+        publicUrl: `${base}/${path}`,
+        maxBytes: MAX_IMAGE_BYTES,
+      };
+    } catch (err: any) {
+      this.logger.error(`Failed to presign category upload: ${err?.message}`);
+      throw new ServiceUnavailableException('Could not create a category image upload URL');
+    }
   }
 
   private async signPut(path: string, contentType: string, sizeBytes: number): Promise<UploadTicket> {

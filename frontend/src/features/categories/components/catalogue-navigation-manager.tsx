@@ -29,7 +29,7 @@ type Publication = {
 };
 type Membership = { groupId: string; categoryId: string };
 type Snapshot = { channels: Channel[]; groups: Group[]; publications: Publication[]; memberships: Membership[] };
-type Category = { id: string; name: string; slug: string };
+type Category = { id: string; name: string; slug: string; imageUrl?: string | null };
 type Product = { id: string; name: string; categories?: Ref[] };
 
 const idOf = (value: Ref) => typeof value === 'string' ? value : value.id;
@@ -138,20 +138,28 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
       {channelId && <>
         <div>
           <h4 className="mb-1 text-sm font-semibold text-slate-700">Categorías publicadas</h4>
-          <p className="mb-3 text-xs text-slate-500">Cada portada reutiliza la imagen principal de un producto publicado. No se duplica el archivo ni se crea una biblioteca independiente.</p>
+          <p className="mb-3 text-xs text-slate-500">La imagen propia de la categoría tiene prioridad. El producto de portada se conserva únicamente como respaldo para categorías antiguas sin imagen.</p>
           <div className="grid max-h-[32rem] gap-3 overflow-auto rounded border border-slate-200 p-3 md:grid-cols-2">
             {categories.map((category) => {
               const publication = publications.get(category.id);
               const categoryProducts = productsForCategory(category.id);
               return (
                 <div className="space-y-2 rounded border border-slate-100 p-3" key={category.id}>
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-16 shrink-0 overflow-hidden rounded border border-slate-200 bg-slate-50">
+                      {category.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={category.imageUrl} alt="" className="h-full w-full object-contain" />
+                      ) : null}
+                    </div>
                   <label className="flex items-center gap-2 text-xs font-semibold">
                     <input type="checkbox" checked={Boolean(publication?.visible)} disabled={busy} onChange={(event) => mutate(() => apiFetch(`/stores/${storeId}/catalogue-navigation/channels/${channelId}/categories/${category.id}`, { method: 'PUT', token, body: JSON.stringify({ visible: event.target.checked, placements: event.target.checked ? defaultPlacements : publication?.placements ?? [] }) }))} />
                     <span>{category.name}</span><span className="font-normal text-slate-400">{category.slug}</span>
                   </label>
+                  </div>
                   {publication?.visible && <>
                     <label className="block text-[11px] font-semibold text-slate-500">
-                      Imagen de portada
+                      Respaldo si la categoría no tiene imagen propia
                       <select className="mt-1 block w-full rounded border border-slate-300 bg-white p-2 text-xs" value={publication.coverProduct ? idOf(publication.coverProduct) : ''} disabled={busy} onChange={(event) => mutate(() => apiFetch(`/stores/${storeId}/catalogue-navigation/channels/${channelId}/categories/${category.id}`, { method: 'PUT', token, body: JSON.stringify({ coverProductId: event.target.value || null }) }))}>
                         <option value="">Automática (producto más reciente)</option>
                         {categoryProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}

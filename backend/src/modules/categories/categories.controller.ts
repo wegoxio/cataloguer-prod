@@ -9,7 +9,9 @@ import {
   Query,
   Req,
   ForbiddenException,
+  Delete,
 } from '@nestjs/common';
+import { IsInt, IsString, Max, Min } from 'class-validator';
 import { isOrganizationAdministrator } from '../auth/tenancy/tenant-scope';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -19,6 +21,16 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { assertCategoryInOrganization } from '../auth/tenancy/tenant-assertions';
+import { MAX_IMAGE_BYTES, StorageService } from '../storage/storage.service';
+
+class CategoryImageUploadDto {
+  @IsString() extension!: string;
+  @IsInt() @Min(1) @Max(MAX_IMAGE_BYTES) size!: number;
+}
+
+class SetCategoryImageDto {
+  @IsString() objectKey!: string;
+}
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('categories')
@@ -26,6 +38,7 @@ export class CategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,
     private readonly em: EntityManager,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -87,6 +100,28 @@ export class CategoriesController {
     return { data: category };
   }
 
+  @Roles('SUPER_ADMIN', 'ADMIN', 'ORGANIZATION_MANAGER')
+  @Post(':id/image/upload-url')
+  async createImageUploadUrl(@Req() req: any, @Param('id') id: string, @Body() body: CategoryImageUploadDto) {
+    await assertCategoryInOrganization(this.em, req.scope, id);
+    return { data: await this.storageService.createCategoryUploadTicket(id, body.extension, body.size) };
+  }
+
+  @Roles('SUPER_ADMIN', 'ADMIN', 'ORGANIZATION_MANAGER')
+  @Patch(':id/image')
+  async setImage(@Req() req: any, @Param('id') id: string, @Body() body: SetCategoryImageDto) {
+    await assertCategoryInOrganization(this.em, req.scope, id);
+    const imageUrl = await this.storageService.categoryPublicUrl(id, body.objectKey);
+    return { data: await this.categoriesService.setImage(req.scope, id, body.objectKey, imageUrl, req.user) };
+  }
+
+  @Roles('SUPER_ADMIN', 'ADMIN', 'ORGANIZATION_MANAGER')
+  @Delete(':id/image')
+  async clearImage(@Req() req: any, @Param('id') id: string) {
+    await assertCategoryInOrganization(this.em, req.scope, id);
+    return { data: await this.categoriesService.setImage(req.scope, id, null, null, req.user) };
+  }
+
   // PHASE 4: archive, restore and permanent delete are ORGANIZATION
   // ADMINISTRATOR acts. A category is shared by every store in the company, so
   // a branch admin removing one would take it away from its siblings. The role
@@ -117,5 +152,4 @@ export class CategoriesController {
     const category = await this.categoriesService.restore(req.scope, id, req.user);
     return { data: category };
   }
-
 }

@@ -17,12 +17,13 @@ import Checkbox from '../../../components/ui/checkbox';
 import Modal from '../../../components/ui/modal';
 import ConfirmModal from '../../../components/ui/confirm-modal';
 import CategoryTable from '../../../features/categories/components/category-table';
-import CategoryForm from '../../../features/categories/components/category-form';
+import CategoryForm, { type CategoryFormSubmission } from '../../../features/categories/components/category-form';
 import { CatalogueNavigationManager } from '../../../features/categories/components/catalogue-navigation-manager';
 import { categoryQueryIdentity, useCategoryList } from '../../../features/categories/category-queries';
 import { queryClient, queryKeys } from '../../../lib/query-client';
 
 import type { Category } from '../../../features/categories/types/category.types';
+import { optimizeImage } from '../../../lib/image-optimizer';
 
 export default function CategoriesPage() {
   const t = useT();
@@ -93,18 +94,17 @@ export default function CategoriesPage() {
   // administrator for archive/restore/delete; the panel now agrees with it.
   const canArchive = canArchiveCatalogueItem(scope);
 
-  const handleCreateOrUpdate = async (data: any) => {
+  const handleCreateOrUpdate = async (data: CategoryFormSubmission) => {
     if (!accessToken) return;
     const method = editingCategory ? 'PATCH' : 'POST';
     const endpoint = editingCategory ? `/categories/${editingCategory.id}` : '/categories';
 
     try {
-      await saveMutation.mutateAsync({
+      const response = await saveMutation.mutateAsync({
         endpoint,
         method,
         body: {
           name: data.name,
-          slug: data.slug,
           description: data.description || null,
           metaTitle: data.metaTitle || null,
           metaDescription: data.metaDescription || null,
@@ -118,6 +118,36 @@ export default function CategoriesPage() {
           showInNavigation: data.showInNavigation !== false,
         },
       });
+
+      const savedCategory = response.data as Category;
+      if (data.imageFile) {
+        const optimized = await optimizeImage(data.imageFile);
+        const ticketResponse = await apiFetch(`/categories/${savedCategory.id}/image/upload-url`, {
+          method: 'POST',
+          token: accessToken,
+          body: JSON.stringify({ extension: 'webp', size: optimized.blob.size }),
+        });
+        const ticket = ticketResponse.data as { path: string; url: string; headers: Record<string, string> };
+        const upload = await fetch(ticket.url, { method: 'PUT', headers: ticket.headers, body: optimized.blob });
+        if (!upload.ok) throw new Error(`Category image upload failed (${upload.status})`);
+        await apiFetch(`/categories/${savedCategory.id}/image`, {
+          method: 'PATCH',
+          token: accessToken,
+          body: JSON.stringify({ objectKey: ticket.path }),
+        });
+      } else if (data.removeImage && editingCategory?.imageUrl) {
+        await apiFetch(`/categories/${savedCategory.id}/image`, { method: 'DELETE', token: accessToken });
+      }
+
+      if (scope?.storeId) {
+        await Promise.all((data.channelChanges ?? []).map(({ channelId, visible }) =>
+          apiFetch(`/stores/${scope.storeId}/catalogue-navigation/channels/${channelId}/categories/${savedCategory.id}`, {
+            method: 'PUT',
+            token: accessToken,
+            body: JSON.stringify({ visible, ...(visible ? { placements: ['HOME', 'CATALOG', 'NAVIGATION'] } : {}) }),
+          }),
+        ));
+      }
 
       toast.success(editingCategory ? 'Category updated' : 'Category created');
       setIsFormOpen(false);
@@ -296,6 +326,8 @@ export default function CategoriesPage() {
           initialValues={editingCategory}
           categories={categories}
           onSubmit={handleCreateOrUpdate}
+          token={accessToken ?? undefined}
+          storeId={scope?.storeId ?? undefined}
           onCancel={() => {
             setIsFormOpen(false);
             setEditingCategory(null);

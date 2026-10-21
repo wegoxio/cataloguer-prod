@@ -31,6 +31,9 @@ export interface Category {
   sortOrder?: number;
   /** Whether a storefront offers this in navigation. Hides nothing else. */
   showInNavigation?: boolean;
+  /** Category-owned storefront artwork. */
+  imageUrl?: string | null;
+  imageObjectKey?: string | null;
   /** A file from the company's library, linked — never uploaded twice. */
 }
 

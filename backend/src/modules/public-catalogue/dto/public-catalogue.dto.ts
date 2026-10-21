@@ -334,7 +334,7 @@ export function mapCategoryToPublicDto(
       return resolved ? { ...ancestor, name: resolved.name } : ancestor;
     }),
     publicLabel: category.publicLabel ?? null,
-    imageUrl: null,
+    imageUrl: category.imageUrl ?? null,
     sortOrder: category.sortOrder ?? 0,
     showInNavigation: category.showInNavigation ?? true,
     kind: category.kind ?? null,

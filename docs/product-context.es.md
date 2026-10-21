@@ -65,7 +65,7 @@ Invariantes: un usuario normal pertenece a organización; un rol de sucursal tie
 
 | Entidad | Relación/finalidad |
 |---|---|
-| `Category` | N:1 organización; padre/hijos; taxonomía jerárquica |
+| `Category` | N:1 organización; padre/hijos; taxonomía jerárquica; imagen propia opcional en S3 |
 | `Product` | Organización/categoría; padre/hijos; raíz de imágenes, campos y relaciones |
 | `StoreProduct` | Producto + sucursal; asignación/publicación local |
 | `ProductImage` | N:1 producto; URL S3, orden y principal |
@@ -80,6 +80,8 @@ Invariantes: un usuario normal pertenece a organización; un rol de sucursal tie
 ### Navegación pública
 
 `CatalogueChannel` representa el canal; contiene `CatalogueGroup`; `CatalogueGroupCategory` ordena categorías dentro del grupo; `StoreCategoryPublication` decide qué categorías expone cada sucursal. La navegación es configurable, no específica de DesignHof. “Mobiliario H1” debe ser configuración del tenant, no lógica del SaaS.
+
+La imagen de `Category` es global para la empresa y se reutiliza al publicar esa categoría en distintos canales. La API pública prioriza esa imagen; para registros antiguos sin ella conserva el fallback a `coverProduct` y luego al producto publicado más reciente. En un grupo de navegación se usa primero la imagen propia de la primera categoría ordenada que la tenga y después el fallback histórico del producto de portada.
 
 ### Inventario
 
@@ -105,7 +107,7 @@ El saldo no se edita directamente: entradas, salidas, ajustes, reservas y transf
 
 El padre agrupa “el mismo producto comercial”; cada hijo es una versión vendible. Ejemplo: Camisa de lino → roja, azul y verde. Cada hijo conserva SKU, imágenes, precio, atributos e inventario propios.
 
-Reglas: un hijo tiene un solo padre; ambos pertenecen a la misma organización; no hay ciclos; el inventario reside en el vendible y no se suma ciegamente al padre; publicación y asignación mantienen coherencia familiar; la API permite seleccionar variantes. Las imágenes pertenecen exclusivamente a productos, no a una biblioteca editorial independiente.
+Reglas: un hijo tiene un solo padre; ambos pertenecen a la misma organización; no hay ciclos; el inventario reside en el vendible y no se suma ciegamente al padre; publicación y asignación mantienen coherencia familiar; la API permite seleccionar variantes. Las fotografías comerciales pertenecen a productos; las categorías pueden tener una imagen de presentación propia, sin convertirse en una biblioteca editorial independiente.
 
 ## 6. Flujos principales
 
@@ -175,4 +177,4 @@ RDS cuando SLA/carga lo justifique; Redis al escalar horizontalmente; workers se
 - No reintroducir CMS/DAM/automatizaciones sin PRD.
 - Cambios de entidades requieren migración y pruebas PostgreSQL.
 - Cambios publicables preservan contrato headless y revalidación multicliente.
-- Toda imagen persistida debe ser propia en S3 y asociarse a un producto.
+- Toda imagen persistida debe ser propia en S3 y asociarse a un producto o categoría concreta.

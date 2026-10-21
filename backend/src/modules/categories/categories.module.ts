@@ -6,10 +6,11 @@ import { CategoriesController } from './categories.controller';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
 import { AuditLogModule } from '../audit-log/audit-log.module';
+import { StorageModule } from '../storage/storage.module';
 // Side-effect import: see products.module.ts.
 
 @Module({
-  imports: [MikroOrmModule.forFeature([Category]), AuthModule, UsersModule, AuditLogModule],
+  imports: [MikroOrmModule.forFeature([Category]), AuthModule, UsersModule, AuditLogModule, StorageModule],
   providers: [CategoriesService],
   controllers: [CategoriesController],
   // `CategoryRemovalService` is exported for `RecoveryModule`, which binds its
