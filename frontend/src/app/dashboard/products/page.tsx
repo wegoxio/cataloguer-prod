@@ -1687,7 +1687,7 @@ export default function ProductsPage() {
           setIsFormOpen(false);
           setEditingProduct(null);
         }}
-        className="max-w-2xl"
+        className="max-w-3xl"
       >
         {editingProduct && canManage && (
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4 pb-4 border-b border-slate-100">

@@ -122,6 +122,7 @@ export default function ProductForm({
   const [categoryIds, setCategoryIds] = React.useState<string[]>(
     initialValues?.categories?.map((c) => c.id) ?? [],
   );
+  const [categorySearch, setCategorySearch] = React.useState('');
   const toggleCategory = (id: string) =>
     setCategoryIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
 
@@ -184,6 +185,12 @@ export default function ProductForm({
 
   // Show active categories, plus any archived one the item already sits in
   const availableCategories = categories.filter((c) => !c.archivedAt || categoryIds.includes(c.id));
+  const visibleCategories = availableCategories
+    .filter((category) => category.name.toLocaleLowerCase().includes(categorySearch.trim().toLocaleLowerCase()))
+    .sort((a, b) => {
+      const selectedDifference = Number(categoryIds.includes(b.id)) - Number(categoryIds.includes(a.id));
+      return selectedDifference || a.name.localeCompare(b.name);
+    });
 
   return (
     <form
@@ -302,18 +309,33 @@ export default function ProductForm({
         </Select>
       </div>
 
-      <div className="space-y-2 p-3 bg-slate-50 rounded-md border border-slate-100">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase">
-          Categories {categoryIds.length === 0 && '— none selected: this item is unassigned'}
-        </p>
-        <p className="text-[11px] text-slate-500">
-          The same item can be in several categories at once — it is still one item.
-        </p>
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          {availableCategories.map((cat) => (
+      <fieldset className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <legend className="text-[10px] font-semibold uppercase text-slate-600">Product categories</legend>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Check every category where this product should appear. This does not choose the category card image.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+            {categoryIds.length} selected
+          </span>
+        </div>
+        <input
+          type="search"
+          value={categorySearch}
+          onChange={(event) => setCategorySearch(event.target.value)}
+          placeholder="Search categories..."
+          aria-label="Search product categories"
+          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        <div className="grid max-h-56 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-slate-200 bg-white p-2 sm:grid-cols-2">
+          {visibleCategories.map((cat) => (
             <label
               key={cat.id}
-              className="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-medium text-slate-700"
+              className={`flex cursor-pointer select-none items-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition-colors ${
+                categoryIds.includes(cat.id) ? 'bg-primary/10 text-primary' : 'text-slate-700 hover:bg-slate-50'
+              }`}
             >
               <input
                 type="checkbox"
@@ -324,8 +346,11 @@ export default function ProductForm({
               {cat.archivedAt ? `[Archived] ${cat.name}` : cat.name}
             </label>
           ))}
+          {visibleCategories.length === 0 && (
+            <p className="col-span-full px-2 py-4 text-center text-xs text-slate-500">No matching categories.</p>
+          )}
         </div>
-      </div>
+      </fieldset>
 
       {isCard ? (
         <div className="space-y-1" data-testid="form-card-price">
@@ -499,7 +524,7 @@ export default function ProductForm({
       </div>
       )}
 
-      <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+      <div className="sticky bottom-0 z-10 -mx-1 flex justify-end gap-2 border-t border-slate-200 bg-white/95 px-1 pb-1 pt-4 backdrop-blur">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>

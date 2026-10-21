@@ -25,6 +25,7 @@ const FOCUSABLE =
 
 export default function Modal({ open, title, onClose, children, footer, className, initialFocusRef }: ModalProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   // The element that opened the dialog, so focus can be handed back to it.
   const openerRef = useRef<HTMLElement | null>(null);
 
@@ -45,6 +46,9 @@ export default function Modal({ open, title, onClose, children, footer, classNam
    */
   useEffect(() => {
     if (!open) return;
+    bodyRef.current?.scrollTo({ top: 0 });
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     openerRef.current = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     const first = initialFocusRef?.current ?? panel?.querySelector<HTMLElement>(FOCUSABLE);
@@ -69,6 +73,7 @@ export default function Modal({ open, title, onClose, children, footer, classNam
     document.addEventListener('keydown', onKeyDown);
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
       openerRef.current?.focus?.();
     };
     // A ref object is stable, so this still runs only when `open` changes.
@@ -78,7 +83,7 @@ export default function Modal({ open, title, onClose, children, footer, classNam
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-2 sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -90,12 +95,11 @@ export default function Modal({ open, title, onClose, children, footer, classNam
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          'w-full max-w-lg bg-white rounded-card border border-line shadow-pop',
-          'max-h-[85vh] flex flex-col outline-none',
+          'flex max-h-[calc(100dvh-1rem)] w-full max-w-lg flex-col overflow-hidden rounded-card border border-line bg-white shadow-pop outline-none sm:max-h-[calc(100dvh-2rem)]',
           className,
         )}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4 sm:px-6">
           <h3 className="text-md font-bold text-slate-800">{title}</h3>
           <button
             onClick={onClose}
@@ -105,8 +109,10 @@ export default function Modal({ open, title, onClose, children, footer, classNam
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="px-6 py-4 overflow-y-auto">{children}</div>
-        {footer && <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">{footer}</div>}
+        <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+          {children}
+        </div>
+        {footer && <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-4 py-4 sm:px-6">{footer}</div>}
       </div>
     </div>
   );
