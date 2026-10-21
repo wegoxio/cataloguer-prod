@@ -1,0 +1,64 @@
+# What `gcloud builds submit` must never upload from this directory.
+#
+# The repo-root .gitignore is NOT applied to a subdirectory build context, and
+# .dockerignore governs the Docker build rather than the gcloud upload — so
+# without this file a plain `gcloud builds submit backend` would ship local
+# secrets and build output into the Cloud Build source bucket.
+#
+# Releases build from `git archive <sha>:backend` (see docs/ops/backend-release.md),
+# which cannot contain untracked files at all; this file is the second line of
+# defence for a direct submit.
+#
+# Note: unlike .gitignore, .gcloudignore does not skip files by default, and
+# JSON files the build needs (package.json, tsconfig*.json, nest-cli.json,
+# pnpm-lock.yaml) MUST be uploaded — never exclude *.json wholesale.
+
+# Local environment files (the example template is committed and safe)
+.env
+.env.*
+!.env.example
+
+# Build output and dependencies — rebuilt inside the image
+dist/
+node_modules/
+build/
+.nest/
+*.tsbuildinfo
+
+# Test and coverage artifacts
+coverage/
+test-results/
+playwright-report/
+*.lcov
+
+# Logs and local process noise
+*.log
+logs/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Credential material — narrowly named, never a blanket JSON rule
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+service-account.json
+service-account-*.json
+gcp-key.json
+gcp-credentials.json
+*-service-account.json
+credentials.json
+.npmrc
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# VCS metadata
+.git/
+.gitignore

@@ -1,0 +1,43 @@
+managePackageManagerVersions: false
+verifyDepsBeforeRun: false
+
+allowBuilds:
+  unrs-resolver: true
+
+minimumReleaseAgeExclude:
+  - '@next/env@16.4.1'
+  - '@next/eslint-plugin-next@16.4.1'
+  - '@next/swc-darwin-arm64@16.4.1'
+  - '@next/swc-darwin-x64@16.4.1'
+  - '@next/swc-linux-arm64-gnu@16.4.1'
+  - '@next/swc-linux-arm64-musl@16.4.1'
+  - '@next/swc-linux-x64-gnu@16.4.1'
+  - '@next/swc-linux-x64-musl@16.4.1'
+  - '@next/swc-win32-arm64-msvc@16.4.1'
+  - '@next/swc-win32-x64-msvc@16.4.1'
+  - '@sentry/browser-utils@11.8.0'
+  - '@sentry/browser@11.8.0'
+  - '@sentry/bundler-plugins@11.8.0'
+  - '@sentry/cloudflare@11.8.0'
+  - '@sentry/core@11.8.0'
+  - '@sentry/feedback@11.8.0'
+  - '@sentry/nextjs@11.8.0'
+  - '@sentry/node@11.8.0'
+  - '@sentry/opentelemetry@11.8.0'
+  - '@sentry/react@11.8.0'
+  - '@sentry/replay-canvas@11.8.0'
+  - '@sentry/replay@11.8.0'
+  - '@sentry/server-runtime-injection@11.8.0'
+  - '@sentry/server-utils@11.8.0'
+  - '@sentry/vercel-edge@11.8.0'
+  - '@tanstack/query-core@5.104.3'
+  - '@tanstack/react-query@5.104.3'
+  - eslint-config-next@16.4.1
+  - next@16.4.1
+  - react-dom@19.3.1
+  - react@19.3.1
+
+overrides:
+  'postcss@<8.5.26': 8.5.30
+  'brace-expansion@>=4.0.0 <5.0.9': 5.0.9
+  'fast-uri@>=3.0.0 <3.1.5': 3.1.5

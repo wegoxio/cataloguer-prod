@@ -1,0 +1,29 @@
+@config "../../tailwind.config.ts";
+@import "tailwindcss";
+@import './theme.css';
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl font-medium transition cursor-pointer px-4 py-2 text-sm;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl font-medium transition cursor-pointer px-4 py-2 text-sm bg-primary text-white shadow-accent hover:bg-primary-hover focus:outline-none;
+  }
+
+  .card {
+    @apply rounded-card border border-line p-4 shadow-card bg-panel;
+  }
+}
+
+body {
+  background-color: #d7dbe1;
+  color: #1d2433;
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+}
+
+@keyframes tooltip-in {
+  to {
+    opacity: 1;
+  }
+}

@@ -1,0 +1,50 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Environment variables
+.env
+.env.staging
+.env.production
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# System/IDE files
+.DS_Store
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+coverage/
+.nyc_output/
+.vitest-localstorage*
+
+# Playwright
+playwright-report/
+test-results/
+docs/DesignHof_woocommerce.csv
+
+# Client proposals (business docs, not code)
+proposals/

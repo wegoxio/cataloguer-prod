@@ -1,0 +1,20 @@
+{
+  // The integrated-journey harness, compiled the way the server is.
+  //
+  // It cannot use the normal build: `tsconfig.build.json` excludes `test/`, and
+  // it cannot use a transpile-only loader either, because type-only imports
+  // that `tsc` erases — `import { Response } from 'express'` — survive isolated
+  // transpilation as real `require` calls for packages pnpm does not expose.
+  //
+  // So it gets its own output directory rather than sharing `dist/`. Sharing it
+  // would move the compiler's inferred root from `src/` to the package root and
+  // relocate `dist/main.js`, which is the exact path every deployment runbook
+  // and the production container entrypoint already names.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-integration",
+    "noEmit": false
+  },
+  "include": ["src/**/*.ts", "test/integration-server.ts", "test/pg-harness.ts", "test/fake-object-store.ts"],
+  "exclude": ["node_modules", "dist", "dist-integration", "**/*.spec.ts"]
+}

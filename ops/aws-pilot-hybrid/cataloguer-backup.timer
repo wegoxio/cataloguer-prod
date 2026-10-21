@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Cataloguer PostgreSQL backup every six hours
+
+[Timer]
+OnCalendar=*-*-* 00/6:17:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=cataloguer-backup.service
+
+[Install]
+WantedBy=timers.target

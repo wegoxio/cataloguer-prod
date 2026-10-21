@@ -1,0 +1,10 @@
+[Unit]
+Description=Cataloguer PostgreSQL backup to private S3
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/cataloguer
+ExecStart=/usr/bin/bash /opt/cataloguer/backup-postgres.sh

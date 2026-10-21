@@ -1,0 +1,9 @@
+{$API_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy backend:3001
+
+  log {
+    output stdout
+    format json
+  }
+}

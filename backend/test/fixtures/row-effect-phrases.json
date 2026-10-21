@@ -1,0 +1,133 @@
+{
+  "_comment": [
+    "The phrasing contract for row effects, shared by the server's downloadable",
+    "report and the browser's row-by-row table.",
+    "",
+    "Both sides are tested against THIS file rather than against their own",
+    "copies of the strings, because the failure this whole feature exists to",
+    "prevent is a report and a screen that describe the same run differently.",
+    "If the wording changes, it changes here once and both tests move together.",
+    "",
+    "Read by: backend/src/modules/imports/execution/__tests__/report-effects.spec.ts",
+    "         frontend/src/features/import-export/wizard/run/row-effects.test.ts"
+  ],
+  "cases": [
+    {
+      "name": "a legacy row that recorded nothing",
+      "effects": null,
+      "expect": {
+        "product": "not recorded",
+        "store": "not recorded",
+        "categories": "not recorded",
+        "stock": "not recorded"
+      }
+    },
+    {
+      "name": "a product created, listed unpublished, filed under a new category, stocked",
+      "effects": {
+        "product": { "state": "CREATED", "sku": "P9ACC-004" },
+        "storeAssociation": { "state": "CREATED", "storeName": "Store B", "published": false },
+        "categories": { "state": "CREATED", "created": ["Aceptacion P9"], "associated": ["Aceptacion P9"] },
+        "inventory": { "state": "CREATED", "locationName": "Store B custody", "locationKind": "STORE", "quantity": 7 }
+      },
+      "expect": {
+        "product": "created",
+        "store": "created in Store B (unpublished)",
+        "categories": "created: Aceptacion P9",
+        "stock": "7 to Store B custody (store)"
+      }
+    },
+    {
+      "name": "a second row reusing the category the first one created",
+      "effects": {
+        "product": { "state": "CREATED", "sku": "P9ACC-005" },
+        "storeAssociation": { "state": "CREATED", "storeName": "Store B", "published": false },
+        "categories": { "state": "EXISTING", "reused": ["Aceptacion P9"], "associated": ["Aceptacion P9"] },
+        "inventory": { "state": "ZERO_NO_MOVEMENT", "quantity": 0 }
+      },
+      "expect": {
+        "product": "created",
+        "store": "created in Store B (unpublished)",
+        "categories": "reused: Aceptacion P9",
+        "stock": "no stock movement (zero)"
+      }
+    },
+    {
+      "name": "a file that asked for neither category nor stock",
+      "effects": {
+        "product": { "state": "UPDATED", "sku": "P9ACC-006" },
+        "storeAssociation": { "state": "NOT_REQUESTED", "published": false },
+        "categories": { "state": "NOT_REQUESTED" },
+        "inventory": { "state": "NOT_REQUESTED" }
+      },
+      "expect": {
+        "product": "updated",
+        "store": "not requested",
+        "categories": "not requested",
+        "stock": "not requested"
+      }
+    },
+    {
+      "name": "a blocked product taking everything it attempted down with it",
+      "effects": {
+        "product": { "state": "BLOCKED", "sku": "P9ACC-007" },
+        "storeAssociation": { "state": "ROLLED_BACK", "storeName": "Store B", "published": false },
+        "categories": { "state": "ROLLED_BACK" },
+        "inventory": { "state": "ROLLED_BACK" }
+      },
+      "expect": {
+        "product": "blocked",
+        "store": "rolled back in Store B (unpublished)",
+        "categories": "rolled back",
+        "stock": "rolled back"
+      }
+    },
+    {
+      "name": "a category that could not be applied, on a row that still imported",
+      "effects": {
+        "product": { "state": "CREATED", "sku": "P9ACC-008" },
+        "categories": { "state": "BLOCKED", "blocked": ["Ropa > Camisas"] },
+        "inventory": { "state": "BLOCKED", "quantity": 4 }
+      },
+      "expect": {
+        "product": "created",
+        "store": "not recorded",
+        "categories": "not applied: Ropa > Camisas",
+        "stock": "blocked"
+      }
+    },
+    {
+      "name": "a row matched and left alone",
+      "effects": {
+        "product": { "state": "UNCHANGED", "sku": "P9ACC-009" },
+        "storeAssociation": { "state": "EXISTING", "storeName": "Store B", "published": false },
+        "categories": { "state": "EXISTING", "reused": ["Ropa"], "associated": ["Ropa"] },
+        "inventory": { "state": "UNCHANGED" }
+      },
+      "expect": {
+        "product": "unchanged",
+        "store": "existing in Store B (unpublished)",
+        "categories": "reused: Ropa",
+        "stock": "unchanged"
+      }
+    },
+    {
+      "name": "created and reused paths reported side by side",
+      "effects": {
+        "product": { "state": "CREATED" },
+        "categories": {
+          "state": "CREATED",
+          "created": ["Aceptacion P9 > Nueva"],
+          "reused": ["Aceptacion P9"],
+          "blocked": ["Archivada"]
+        }
+      },
+      "expect": {
+        "product": "created",
+        "store": "not recorded",
+        "categories": "created: Aceptacion P9 > Nueva | reused: Aceptacion P9 | not applied: Archivada",
+        "stock": "not recorded"
+      }
+    }
+  ]
+}
