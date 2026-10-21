@@ -1,4 +1,4 @@
-{$API_DOMAIN} {
+{$API_DOMAIN} {$API_DOMAIN_ALIAS:api.cataloguer.wegox.io} {
   encode zstd gzip
   reverse_proxy backend:3001
 

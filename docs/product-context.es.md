@@ -8,8 +8,8 @@ Cataloguer es un SaaS multiempresa y multisucursal para administrar categorías,
 
 No es un CMS, constructor web ni clon de WordPress. SEO, hero, páginas, footer y contenido editorial pertenecen al código de cada storefront. El piloto conecta:
 
-- Panel: `https://admin.cataloguer.wegox.io`.
-- API: `https://api.cataloguer.wegox.io/api/v1`.
+- Panel: `https://admin.catalog.wegox.io`.
+- API: `https://api.catalog.wegox.io/api/v1`.
 - Primer storefront: `https://designhof.com`.
 - Imágenes: `cataloguer-products-bucket` en S3.
 
@@ -134,8 +134,8 @@ Argon2; access token corto; refresh rotatorio en cookie `HttpOnly`, `Secure`, `S
 Producción ya contiene:
 
 ```env
-CORS_ALLOWED_ORIGINS=https://admin.cataloguer.wegox.io
-FRONTEND_URL=https://admin.cataloguer.wegox.io
+CORS_ALLOWED_ORIGINS=https://admin.catalog.wegox.io
+FRONTEND_URL=https://admin.catalog.wegox.io
 ```
 
 Desplegar el admin en ese dominio no requiere cambiar el backend. `designhof.com` no necesita CORS si consume desde el servidor Next.js. Tras desplegarlo sí debe agregarse y probarse:

@@ -5,11 +5,11 @@
 ## 1. Topología
 
 ```text
-Vercel: admin.cataloguer.wegox.io     Vercel: designhof.com + clientes
+Vercel: admin.catalog.wegox.io        Vercel: designhof.com + clientes
                    \                   /
                     HTTPS / X-Api-Key
                              |
- api.cataloguer.wegox.io -> 13.61.76.35 (AWS Lightsail, eu-north-1)
+ api.catalog.wegox.io -> 13.61.76.35 (AWS Lightsail, eu-north-1)
                              |
           Caddy :80/:443 -> NestJS :3001 -> PostgreSQL 16
                              |
@@ -25,7 +25,7 @@ Los frontends viven en Vercel. AWS aloja API, base de datos y almacenamiento par
 | Cuenta/región | `420151437743` / `eu-north-1` |
 | Lightsail | `cataloguer-pilot-prod`, Ubuntu 24.04 |
 | Capacidad/coste | 4 GB RAM, 2 vCPU, 80 GB; ~USD 24/mes |
-| IP/DNS | `13.61.76.35` / `api.cataloguer.wegox.io` |
+| IP/DNS | `13.61.76.35` / `api.catalog.wegox.io` |
 | Runtime | Docker 29, Compose 5, Node 22 |
 | Proxy | Caddy 2; Let’s Encrypt y renovación automática |
 | Base de datos | PostgreSQL 16 en volumen Docker privado |
@@ -38,7 +38,7 @@ Los frontends viven en Vercel. AWS aloja API, base de datos y almacenamiento par
 
 Puertos públicos 80/443. SSH 22 está restringido en Lightsail a la IP administrativa. PostgreSQL y NestJS no se exponen; Caddy redirige HTTP, termina TLS y reenvía al backend.
 
-`ops/aws-pilot-hybrid/compose.yaml` define `postgres`, `backend`, `caddy` e `import-runner` (perfil manual `tools`). PostgreSQL/backend tienen health checks; backend limita memoria a 1200 MB; logs rotan a 3 × 10 MB. Salud pública: `GET https://api.cataloguer.wegox.io/api/v1/health`.
+`ops/aws-pilot-hybrid/compose.yaml` define `postgres`, `backend`, `caddy` e `import-runner` (perfil manual `tools`). PostgreSQL/backend tienen health checks; backend limita memoria a 1200 MB; logs rotan a 3 × 10 MB. Salud pública: `GET https://api.catalog.wegox.io/api/v1/health`.
 
 ## 4. Persistencia y S3
 
@@ -61,8 +61,8 @@ Los secretos están en `/opt/cataloguer/.env.backend` y `.env.infrastructure` co
 Ya están configurados:
 
 ```env
-CORS_ALLOWED_ORIGINS=https://admin.cataloguer.wegox.io
-FRONTEND_URL=https://admin.cataloguer.wegox.io
+CORS_ALLOWED_ORIGINS=https://admin.catalog.wegox.io
+FRONTEND_URL=https://admin.catalog.wegox.io
 ```
 
 El admin no requerirá reconfiguración si conserva ese dominio. DesignHof llama la API pública desde servidor y no requiere CORS. Después de desplegarlo debe configurarse la revalidación:
