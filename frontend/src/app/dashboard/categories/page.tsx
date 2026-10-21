@@ -127,8 +127,14 @@ export default function CategoriesPage() {
           token: accessToken,
           body: JSON.stringify({ extension: 'webp', size: optimized.blob.size }),
         });
-        const ticket = ticketResponse.data as { path: string; url: string; headers: Record<string, string> };
-        const upload = await fetch(ticket.url, { method: 'PUT', headers: ticket.headers, body: optimized.blob });
+        const ticket = ticketResponse.data as { path: string; url: string };
+        // Content-Length is signed by the backend but is a forbidden browser
+        // header; fetch derives it from the Blob exactly as product uploads do.
+        const upload = await fetch(ticket.url, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'image/webp' },
+          body: optimized.blob,
+        });
         if (!upload.ok) throw new Error(`Category image upload failed (${upload.status})`);
         await apiFetch(`/categories/${savedCategory.id}/image`, {
           method: 'PATCH',
