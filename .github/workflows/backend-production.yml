@@ -20,11 +20,11 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
         with:
           version: 11.17.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
@@ -35,7 +35,7 @@ jobs:
       # legacy Prettier-as-ESLint rule; semantic/type lint rules still run.
       - run: >-
           pnpm exec eslint "src/**/*.ts" --rule "prettier/prettier: off"
-      - run: pnpm test -- --runInBand
+      - run: pnpm exec jest --runInBand
       - run: pnpm run build
 
   deploy:
@@ -45,7 +45,7 @@ jobs:
     environment: production
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build immutable backend image
         run: docker build --tag "cataloguer-backend:${GITHUB_SHA}" backend
       - name: Export image
