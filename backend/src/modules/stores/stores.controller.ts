@@ -1,15 +1,4 @@
-import {
-  Body,
-  Controller,
-  ForbiddenException,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { StoresService } from './stores.service';
 import { CreateStoreDto, UpdateStoreDto } from './dto/store.dto';
 import { SetStorePlanDto } from './dto/store-admin.dto';
@@ -88,8 +77,9 @@ export class StoresController {
   @Patch(':id/plan')
   async setPlan(@Req() req: any, @Param('id') id: string, @Body() body: SetStorePlanDto) {
     this.assertPlatformOwner(req.scope);
-    const store = await this.storesService.setPlan(id, body.plan, req.user);
-    return { data: store };
+    void id;
+    void body;
+    throw new ForbiddenException('Plan changes must use the organization verification flow');
   }
 
   // Store structure (§12): organization-level authority. ADMIN holds none.
@@ -116,5 +106,4 @@ export class StoresController {
   async restore(@Req() req: any, @Param('id') id: string) {
     return { data: await this.storesService.restore(id, req.scope, req.user) };
   }
-
 }

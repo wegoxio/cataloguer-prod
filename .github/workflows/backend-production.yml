@@ -1,0 +1,55 @@
+name: Backend production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cataloguer-backend-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify backend
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      # The repository is checked out with LF on Linux. Disable only the
+      # legacy Prettier-as-ESLint rule; semantic/type lint rules still run.
+      - run: pnpm exec eslint "src/**/*.ts" --rule "prettier/prettier: off"
+      - run: pnpm test -- --runInBand
+      - run: pnpm run build
+
+  deploy:
+    name: Deploy to Lightsail
+    needs: verify
+    runs-on: [self-hosted, linux, x64, cataloguer-prod]
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build immutable backend image
+        run: docker build --tag "cataloguer-backend:${GITHUB_SHA}" backend
+      - name: Export image
+        run: docker save "cataloguer-backend:${GITHUB_SHA}" | gzip -1 > "/tmp/cataloguer-backend-${GITHUB_SHA}.tar.gz"
+      - name: Migrate and release
+        run: sudo /opt/cataloguer/deploy-release.sh "${GITHUB_SHA}" "/tmp/cataloguer-backend-${GITHUB_SHA}.tar.gz"
+
+

@@ -73,6 +73,7 @@ export const queryKeys = {
   apiKeys: (identity: string) => ['website', identity, 'api-keys'] as const,
   catalogDashboard: (identity: string, includeActivity: boolean) => ['dashboard', identity, 'catalog', { includeActivity }] as const,
   ownerOverview: ['dashboard', 'platform', 'overview'] as const,
+  clientDetails: (organizationId: string) => ['dashboard', 'platform', 'clients', organizationId] as const,
   ownerActivity: ['dashboard', 'platform', 'activity'] as const,
   activeCompanies: (reloadNonce: number) => ['organizations', 'active', reloadNonce] as const,
   platformUsersRoot: ['platform-users'] as const,

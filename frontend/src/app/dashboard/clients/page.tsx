@@ -10,20 +10,17 @@ import { isUnscopedPlatformOwner } from '../../../lib/permissions';
 import { apiFetch } from '../../../lib/api-client';
 import { useT } from '../../../lib/i18n';
 import { useToast } from '../../../components/ui/toast';
-import { enterManagedTenant } from '../../../lib/managed-tenant';
 import Badge from '../../../components/ui/badge';
 import Button from '../../../components/ui/button';
 import Input from '../../../components/ui/input';
 import Modal from '../../../components/ui/modal';
 import { Table, THead, TH, TBody, TR, TD, EmptyState } from '../../../components/ui/table';
-import ActiveCompaniesCard from '../../../features/organizations/components/active-companies-card';
 import { useOwnerOverview } from '../../../lib/domain-queries';
 import { queryKeys } from '../../../lib/query-client';
 
 interface ClientRow {
   id: string;
-  /** The client that owns this store (P0-11). */
-  organizationId: string | null;
+  organizationId: string;
   name: string;
   websiteUrl: string | null;
   plan: { key: string; name: string; priceUsd: number | null; complimentary?: boolean };
@@ -32,6 +29,8 @@ interface ClientRow {
   createdAt: string;
   usersCount: number;
   productsCount: number;
+  categoriesCount: number;
+  storesCount: number;
   ordersThisMonth: number;
   revenueThisMonth: number;
   totalPaid: number;
@@ -89,7 +88,6 @@ const deliveryStatusOf = (value: unknown): DeliveryStatus =>
  * through the Websites section.
  */
 export default function ClientsPage() {
-  const reloadNonce = 0;
   const { user, scope, accessToken } = useAuth();
   const router = useRouter();
   const t = useT();
@@ -100,17 +98,7 @@ export default function ClientsPage() {
   const [newClient, setNewClient] = useState({ name: '', websiteUrl: '', adminEmail: '' });
   const [creating, setCreating] = useState(false);
   const [resending, setResending] = useState(false);
-  /**
-   * The result of the last onboarding, kept so the operator is told plainly
-   * what happened — especially when the invitation email did not go out, which
-   * is a delivery outcome and NOT a rollback (D5).
-   *
-   * `deliveryStatus` is three-valued because the truth is. A boolean forced
-   * "no attempt was made on this request" into the same shape as "the attempt
-   * failed", so an exact retry — which deliberately sends nothing — rendered
-   * failure copy over an invitation that was perfectly fine, and went on doing
-   * it after the manager had already accepted.
-   */
+
   const [onboarded, setOnboarded] = useState<{
     organizationId: string;
     organizationName: string;
@@ -242,15 +230,6 @@ export default function ClientsPage() {
         </Button>
       </div>
 
-      {/*
-       * The outcome of the last onboarding, stated plainly.
-       *
-       * An undelivered invitation is NOT a failed onboarding: the company, its
-       * website, its manager and the invitation itself are all committed. Saying
-       * "failed" here would send the operator looking for a company that exists,
-       * so the banner says exactly what happened and offers the one action that
-       * fixes it.
-       */}
       {onboarded && (
         <div
           data-testid="onboarding-result"
@@ -270,13 +249,7 @@ export default function ClientsPage() {
                 ? t('That company already existed — nothing was created twice.')
                 : `${onboarded.organizationName} ${t('is ready.')}`}
             </p>
-            {/*
-             * FOUR STATES, and each says only what is known.
-             *
-             * An accepted invitation is read FIRST, because after acceptance
-             * there is no invitation left to describe as delivered or failed —
-             * and the old boolean kept offering to re-send one.
-             */}
+
             <p className="text-xs text-slate-600" data-testid="onboarding-invitation-state">
               {!onboarded.pending
                 ? `${t('Its manager')} ${onboarded.managerEmail} ${t('has already accepted the invitation and can sign in.')}`
@@ -351,19 +324,6 @@ export default function ClientsPage() {
           </div>
         </div>
       </Modal>
-
-      {accessToken && (
-        // #294: an ACTIVE company is a row of its own here, and is removable
-        // without an archive first when it has no live branch. The overview
-        // table below lists branches, so a branch-less company has no row there.
-        <ActiveCompaniesCard
-          accessToken={accessToken}
-          canManagePlan={isOwner}
-          plans={overview?.plans ?? []}
-          onPlanChanged={refreshOverview}
-          reloadNonce={reloadNonce}
-        />
-      )}
 
       {overview && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -450,40 +410,8 @@ export default function ClientsPage() {
                   </TD>
                   <TD align="right">
                     <div className="inline-flex items-center gap-3">
-                      {!client.archivedAt && (
-                        <button
-                          onClick={() => {
-                            // Managing means entering the COMPANY, at company
-                            // level (corrected in P5-W5).
-                            //
-                            // This used to narrow to the client's store as an
-                            // "initial branch narrowing" (P0-11), which the
-                            // P5-A2 authority model turned into a trap: a
-                            // narrowed actor is acting as ONE BRANCH, so it may
-                            // not archive a product or a category, may not
-                            // reassign stores, and may not delete a shared
-                            // file — and the branch selector that widens back
-                            // out only appears for a company with more than one
-                            // store. Entering a one-store client therefore left
-                            // the owner permanently below the authority it
-                            // actually holds, with no way back.
-                            //
-                            // Narrowing stays available and deliberate: pick a
-                            // branch from the selector once inside.
-                            enterManagedTenant({
-                              organizationId: client.organizationId ?? client.id,
-                              organizationName: client.name,
-                            });
-                            router.push('/dashboard');
-                          }}
-                          className="text-xs font-semibold text-primary hover:underline"
-                          title={t('Work inside this company: its items, sales and settings')}
-                        >
-                          {t('Manage')}
-                        </button>
-                      )}
-                      <Link href={`/dashboard/website/${client.id}`} className="text-xs font-semibold text-slate-400 hover:text-primary">
-                        {t('Open')}
+                      <Link href={`/dashboard/clients/${client.organizationId}`} className="text-xs font-semibold text-primary hover:underline">
+                        {t('Details')}
                       </Link>
                     </div>
                   </TD>

@@ -17,5 +17,6 @@ import { BillingController } from './billing.controller';
   imports: [MikroOrmModule.forFeature([Payment, Store, AuditLog]), AuthModule, UsersModule],
   providers: [AuditLogService, StripeService, StripeReconcileService],
   controllers: [BillingController, StripeWebhookController, StripeEventsController, StripeReconcileController],
+  exports: [StripeService],
 })
 export class BillingModule {}

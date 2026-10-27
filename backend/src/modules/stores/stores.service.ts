@@ -10,7 +10,12 @@ import { CreateStoreDto, UpdateStoreDto } from './dto/store.dto';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { EntityType, Action } from '../audit-log/entities/audit-log.entity';
 import { Actor } from '../audit-log/types/actor.type';
-import { isOrganizationAdministrator, isUnscopedPlatform, scopeAllowsStore, TenantScope } from '../auth/tenancy/tenant-scope';
+import {
+  isOrganizationAdministrator,
+  isUnscopedPlatform,
+  scopeAllowsStore,
+  TenantScope,
+} from '../auth/tenancy/tenant-scope';
 import { OrganizationPlanPolicy } from '../billing/plans/organization-plan-policy';
 import { ensureStoreCustodyIn } from '../inventory/locations/inventory-location-provisioning';
 
@@ -212,63 +217,71 @@ export class StoresService {
     const em = this.storeRepository.getEntityManager();
     // #294: a REMOVED company's branches leave the Clients overview explicitly —
     // the relation is nullable, so the company filter alone would keep the rows.
-    const stores = await this.storeRepository.find({}, {
-      orderBy: { createdAt: QueryOrder.ASC },
-      populate: ['organization'] as never,
-    });
+    const companies = await em.find(Organization, {}, { orderBy: { createdAt: QueryOrder.ASC } });
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
 
     const connection = em.getConnection();
-    const [userRows, orderRows, paymentRows, productRows] = await Promise.all([
+    const [storeRows, userRows, orderRows, paymentRows, productRows, categoryRows] = await Promise.all([
+      connection.execute(
+        `SELECT organization_id, count(*)::int AS stores,
+                count(*) FILTER (WHERE archived_at IS NULL)::int AS active_stores,
+                (array_agg(website_url ORDER BY created_at) FILTER (WHERE archived_at IS NULL AND website_url IS NOT NULL))[1] AS website_url
+           FROM stores WHERE removed_at IS NULL AND organization_id IS NOT NULL GROUP BY organization_id`,
+      ),
       connection.execute(
         // ONE literal, deliberately: the query-surface census reads statements,
         // and a statement split across concatenated strings is a statement it
         // cannot reason about.
-        `SELECT store_id, count(*)::int AS users FROM users
-          WHERE deleted_at IS NULL AND removed_at IS NULL AND store_id IS NOT NULL
-          GROUP BY store_id`,
+        `SELECT organization_id, count(*)::int AS users FROM users
+          WHERE deleted_at IS NULL AND removed_at IS NULL AND organization_id IS NOT NULL
+          GROUP BY organization_id`,
       ),
       connection.execute(
-        `SELECT store_id,
+        `SELECT organization_id,
                 count(*) FILTER (WHERE created_at >= ?)::int AS month_orders,
                 coalesce(sum(total_usd) FILTER (WHERE created_at >= ? AND status <> 'CANCELLED'), 0)::float AS month_revenue,
                 max(created_at) AS last_order_at
-           FROM sales_orders GROUP BY store_id`,
+           FROM sales_orders WHERE organization_id IS NOT NULL GROUP BY organization_id`,
         [monthStart, monthStart],
       ),
       connection.execute(
-        `SELECT store_id, coalesce(sum(amount_usd), 0)::float AS total_paid, max(paid_at) AS last_payment_at
-           FROM payments WHERE status = 'PAID' GROUP BY store_id`,
+        `SELECT s.organization_id, coalesce(sum(p.amount_usd), 0)::float AS total_paid,
+                max(p.paid_at) AS last_payment_at
+           FROM payments p JOIN stores s ON s.id = p.store_id
+          WHERE p.status = 'PAID' AND s.organization_id IS NOT NULL GROUP BY s.organization_id`,
       ),
       connection.execute(
         // #292: a branch's item count excludes removed items. The pivot row is
         // retained with its item, so counting the pivot alone would keep
         // reporting stock a branch cannot see.
-        `SELECT sp.store_id, count(*)::int AS products
-           FROM store_products sp JOIN products p ON p.id = sp.product_id
-          WHERE p.removed_at IS NULL
-          GROUP BY sp.store_id`,
+        `SELECT organization_id, count(*)::int AS products FROM products
+          WHERE removed_at IS NULL AND organization_id IS NOT NULL GROUP BY organization_id`,
+      ),
+      connection.execute(
+        `SELECT organization_id, count(*)::int AS categories FROM categories
+          WHERE removed_at IS NULL AND organization_id IS NOT NULL GROUP BY organization_id`,
       ),
     ]);
 
-    const byStore = <T extends { store_id: string }>(rows: T[]) => new Map(rows.map((row) => [row.store_id, row]));
-    const users = byStore(userRows as any[]);
-    const orders = byStore(orderRows as any[]);
-    const payments = byStore(paymentRows as any[]);
-    const products = byStore(productRows as any[]);
+    const byOrganization = <T extends { organization_id: string }>(rows: T[]) =>
+      new Map(rows.map((row) => [row.organization_id, row]));
+    const stores = byOrganization(storeRows as any[]);
+    const users = byOrganization(userRows as any[]);
+    const orders = byOrganization(orderRows as any[]);
+    const payments = byOrganization(paymentRows as any[]);
+    const products = byOrganization(productRows as any[]);
+    const categories = byOrganization(categoryRows as any[]);
 
-    const clients = stores.map((store) => {
-      const organization = this.orgOf(store);
-      const plan = PLANS[organization?.plan] ?? PLANS[DEFAULT_PLAN];
+    const clients = companies.map((organization) => {
+      const plan = PLANS[organization.plan] ?? PLANS[DEFAULT_PLAN];
       return {
-        id: store.id,
-        // P0-11: entering "manage client" needs the ORGANIZATION id
-        organizationId: organization?.id ?? null,
-        name: store.name,
-        slug: store.slug,
-        websiteUrl: store.websiteUrl ?? null,
+        id: organization.id,
+        organizationId: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+        websiteUrl: (stores.get(organization.id) as any)?.website_url ?? null,
         plan: {
           key: plan.key,
           name: plan.name,
@@ -276,21 +289,24 @@ export class StoresService {
           complimentary: plan.complimentary,
         },
         billingStatus: effectiveBillingStatus(organization),
-        archivedAt: store.archivedAt ?? null,
-        organizationArchivedAt: organization?.archivedAt ?? null,
-        organizationMergedIntoId: organization?.mergedIntoOrganizationId ?? null,
-        createdAt: store.createdAt,
-        usersCount: (users.get(store.id) as any)?.users ?? 0,
-        productsCount: (products.get(store.id) as any)?.products ?? 0,
-        ordersThisMonth: (orders.get(store.id) as any)?.month_orders ?? 0,
-        revenueThisMonth: (orders.get(store.id) as any)?.month_revenue ?? 0,
-        lastOrderAt: (orders.get(store.id) as any)?.last_order_at ?? null,
-        totalPaid: (payments.get(store.id) as any)?.total_paid ?? 0,
-        lastPaymentAt: (payments.get(store.id) as any)?.last_payment_at ?? null,
+        archivedAt: organization.archivedAt ?? null,
+        organizationArchivedAt: organization.archivedAt ?? null,
+        organizationMergedIntoId: organization.mergedIntoOrganizationId ?? null,
+        createdAt: organization.createdAt,
+        storesCount: (stores.get(organization.id) as any)?.stores ?? 0,
+        activeStoresCount: (stores.get(organization.id) as any)?.active_stores ?? 0,
+        usersCount: (users.get(organization.id) as any)?.users ?? 0,
+        productsCount: (products.get(organization.id) as any)?.products ?? 0,
+        categoriesCount: (categories.get(organization.id) as any)?.categories ?? 0,
+        ordersThisMonth: (orders.get(organization.id) as any)?.month_orders ?? 0,
+        revenueThisMonth: (orders.get(organization.id) as any)?.month_revenue ?? 0,
+        lastOrderAt: (orders.get(organization.id) as any)?.last_order_at ?? null,
+        totalPaid: (payments.get(organization.id) as any)?.total_paid ?? 0,
+        lastPaymentAt: (payments.get(organization.id) as any)?.last_payment_at ?? null,
       };
     });
 
-    const active = clients.filter((client) => !client.archivedAt);
+    const active = clients.filter((client) => !client.archivedAt && !client.organizationMergedIntoId);
     // RECURRING REVENUE IS PER COMPANY (#318). A plan belongs to a company, so
     // each live company is counted EXACTLY ONCE — with no branch, one, or many —
     // at its effective price; Plan Gratis and a contractual $0 add nothing.
@@ -298,8 +314,8 @@ export class StoresService {
     // never counted a company without a branch. The removal filter is on, so a
     // removed company is excluded; archived and merged companies are excluded
     // explicitly. Every other total keeps its meaning.
-    const companies = await em.find(Organization, { archivedAt: null, mergedIntoOrganizationId: null } as never);
-    const monthlyRecurringUsd = companies.reduce(
+    const recurringCompanies = companies.filter((company) => !company.archivedAt && !company.mergedIntoOrganizationId);
+    const monthlyRecurringUsd = recurringCompanies.reduce(
       (sum, company) => sum + (effectivePlanPriceUsd(PLANS[company.plan] ?? PLANS[DEFAULT_PLAN], company) ?? 0),
       0,
     );
@@ -307,7 +323,7 @@ export class StoresService {
       totals: {
         activeClients: active.length,
         monthlyRecurringUsd,
-        recurringCompanies: companies.length,
+        recurringCompanies: recurringCompanies.length,
         ordersThisMonth: active.reduce((sum, client) => sum + client.ordersThisMonth, 0),
         revenueThisMonth: active.reduce((sum, client) => sum + client.revenueThisMonth, 0),
       },
@@ -367,9 +383,9 @@ export class StoresService {
 
   /** Owner-only: turns a client's paid add-ons (navbar modules) on/off. */
   /** Content blocks of a website (Builder-editable site copy). */
-    // #174: typed IMAGE blocks must reference this catalog's own storage.
-    // Every other type (TEXT, COLOR, FLAG, absent-defaulting-to-TEXT…) keeps
-    // its behavior untouched — the type contract itself is #173 territory.
+  // #174: typed IMAGE blocks must reference this catalog's own storage.
+  // Every other type (TEXT, COLOR, FLAG, absent-defaulting-to-TEXT…) keeps
+  // its behavior untouched — the type contract itself is #173 territory.
   /** Removes a content override: the website falls back to its original text. */
   async create(dto: CreateStoreDto, scope?: TenantScope, actor?: Actor): Promise<Store> {
     this.assertStoreCreationAuthority(scope);
@@ -409,11 +425,7 @@ export class StoresService {
        *
        * Cap the search: beyond 50 collisions fall back to a time suffix.
        */
-      while (
-        autoSlug &&
-        slugSuffix <= 50 &&
-        (await tem.findOne(Store, { slug: autoSlug }))
-      ) {
+      while (autoSlug && slugSuffix <= 50 && (await tem.findOne(Store, { slug: autoSlug }))) {
         autoSlug = `${slugify(dto.name)}-${slugSuffix++}`;
       }
       if (slugSuffix > 50) autoSlug = `${slugify(dto.name)}-${Date.now().toString(36)}`;
@@ -521,13 +533,13 @@ export class StoresService {
 
   /** Every pop-up this store has run, newest first (Pop-ups tab history). */
   /** Copies a past pop-up back onto the store and turns it on. */
-    // #174: historical snapshots must not smuggle a pre-policy external image
-    // back onto the store — reactivation re-validates like any other write
-      // Re-publishing a past pop-up is a NEW use: an archived image is refused
-      // here rather than silently going live again.
-    // A past end date would keep it invisible — re-activate open-ended instead
+  // #174: historical snapshots must not smuggle a pre-policy external image
+  // back onto the store — reactivation re-validates like any other write
+  // Re-publishing a past pop-up is a NEW use: an archived image is refused
+  // here rather than silently going live again.
+  // A past end date would keep it invisible — re-activate open-ended instead
   /** Removes a pop-up from the history. If it's the live one, also turns it off. */
-    // If this snapshot is the one currently live, take it down with it
+  // If this snapshot is the one currently live, take it down with it
 
   async archive(id: string, scope?: TenantScope, actor?: Actor): Promise<Store> {
     this.assertCoreStoreAuthority(id, scope);

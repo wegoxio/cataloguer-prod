@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import React from 'react';
-import { renderComponent, cleanupAll, click, select } from '../../../test/render';
+import { renderComponent, cleanupAll, click, select, type } from '../../../test/render';
 import { I18nProvider } from '../../../lib/i18n';
 import ActiveCompaniesCard from './active-companies-card';
 
@@ -17,7 +17,8 @@ vi.mock('../../../lib/api-client', () => ({
   apiFetch: async (path: string, init?: { method?: string; body?: string }) => {
     calls.push({ path, method: init?.method ?? 'GET', body: init?.body ? JSON.parse(init.body) : undefined });
     if (path.startsWith('/organizations?includeArchived=true')) return { data: companies };
-    return { data: { id: 'ok' } };
+    if (path.endsWith('/plan-change/challenges')) return { data: { challengeId: 'challenge-1', email: 'ad***@example.com', expiresAt: new Date(Date.now() + 600000).toISOString() } };
+    return { data: { plan: { key: 'GRATIS' } } };
   },
 }));
 const toast = { success: vi.fn(), error: vi.fn() };
@@ -82,9 +83,16 @@ describe('ActiveCompaniesCard — the company plan control (#318)', () => {
       expect(notice).toContain(line);
     }
     await click(q(view, 'company-plan-save'));
+    await click(q(view, 'company-plan-send-code'));
+    await flush();
+    await type(view.container.querySelector('#plan-change-code'), '123456');
+    await click(q(view, 'company-plan-confirm'));
     await flush();
     const writes = calls.filter((c) => c.method !== 'GET');
-    expect(writes).toEqual([{ path: '/organizations/org-basico', method: 'PATCH', body: { plan: 'GRATIS' } }]);
+    expect(writes).toEqual([
+      { path: '/organizations/org-basico/plan-change/challenges', method: 'POST', body: { plan: 'GRATIS' } },
+      { path: '/organizations/org-basico/plan-change/confirm', method: 'POST', body: { challengeId: 'challenge-1', code: '123456' } },
+    ]);
     expect(view.onPlanChanged).toHaveBeenCalledTimes(1);
     expect(toast.success).toHaveBeenCalled();
   });

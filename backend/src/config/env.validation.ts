@@ -100,6 +100,10 @@ class EnvironmentVariables {
 
   @IsString()
   @IsOptional()
+  PLAN_CHANGE_CODE_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
   FRONTEND_URL?: string;
 
   // Signed fan-out to connected storefronts. JSON is structurally validated

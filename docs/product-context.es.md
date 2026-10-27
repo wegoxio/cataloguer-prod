@@ -123,6 +123,12 @@ Crear producto → categoría y atributos → familia si aplica → imágenes fi
 
 El importador lee el workbook, normaliza, resuelve categorías/familias, crea o actualiza productos, descarga imágenes externas, las sube a S3 y persiste sus URLs. Genera reportes por ejecución/fila. Primero se analiza y luego se ejecuta con confirmación explícita. La fuente final es PostgreSQL + S3, no WooCommerce.
 
+### Administración de clientes
+
+La pantalla **Clientes** representa organizaciones, no sucursales: una empresa aparece una sola vez aunque tenga varias sedes. Su detalle agrega catálogo, categorías, sucursales, equipo, pedidos, ingresos, pagos, plan y próxima renovación de Stripe cuando exista. Desde allí el SUPER_ADMIN global puede entrar en el contexto de la empresa.
+
+El cambio de plan es una operación sensible en dos fases. Primero se confirma el plan de destino y el backend envía al correo del administrador actuante un código aleatorio de seis dígitos, de un solo uso y con diez minutos de vigencia. La base conserva únicamente su HMAC, limita solicitudes e intentos y liga el desafío a actor, empresa y plan. Solo la confirmación correcta modifica el plan y genera el registro de auditoría dentro de la misma transacción. Las antiguas rutas directas de cambio de plan lo rechazan para impedir eludir esta verificación.
+
 ### Consumo storefront
 
 Next.js utiliza `X-Api-Key` exclusivamente en servidor, consulta navegación/listados/detalle y renderiza. Cataloguer llama al endpoint privado de revalidación cuando cambia información publicable.

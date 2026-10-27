@@ -1,6 +1,6 @@
 # Cataloguer — arquitectura AWS desplegada
 
-> Documento canónico de infraestructura y operación. Estado al 21 de octubre de 2026.
+> Documento canónico de infraestructura y operación. Estado al 27 de octubre de 2026.
 
 ## 1. Topología
 
@@ -93,11 +93,38 @@ systemctl status cataloguer-backup.timer
 
 Un release manual valida código, construye imagen inmutable, ejecuta migraciones una sola vez, recrea backend, espera health check, prueba API/S3/autenticación y conserva la imagen anterior para rollback. Los scripts reproducibles están en `ops/aws-pilot-hybrid`.
 
+### CI/CD del backend
+
+`.github/workflows/backend-production.yml` despliega automáticamente cada `push` a `main` y también admite ejecución manual. El flujo:
+
+1. instala dependencias reproducibles;
+2. ejecuta tipos, ESLint semántico, pruebas y build;
+3. construye una imagen Docker inmutable etiquetada con el SHA completo;
+4. el job de despliegue se asigna al runner autohospedado `cataloguer-prod` dentro de Lightsail;
+5. construye allí la imagen, crea un backup PostgreSQL y ejecuta migraciones con la imagen nueva;
+6. sustituye únicamente el backend, espera su health check y prueba la URL pública;
+7. ante fallo restaura la imagen anterior.
+
+La migración se ejecuta antes de reemplazar la aplicación. Por ello toda migración de producción debe ser **compatible hacia delante** con la versión anterior durante esa ventana: añadir antes de eliminar, no renombrar/destruir una columna consumida por la versión activa en el mismo release. El rollback restaura la aplicación; nunca intenta revertir automáticamente datos o esquema.
+
+El servidor debe conservar instalado y propiedad de `root` el script versionado:
+
+```bash
+sudo install -o root -g root -m 0755 \
+  /ruta/al/repo/ops/aws-pilot-hybrid/deploy-release.sh \
+  /opt/cataloguer/deploy-release.sh
+```
+
+La cuenta AWS aplica un SCP que impide crear el proveedor IAM OIDC requerido por GitHub. El runner autohospedado evita degradar la seguridad: no almacena access keys AWS, no requiere secretos SSH, no abre nuevos puertos y solo establece conexiones HTTPS salientes hacia GitHub. El job `verify` permanece en runners desechables de GitHub; únicamente un commit ya validado llega al runner productivo. El entorno GitHub `production` debe aceptar exclusivamente la rama `main`.
+
+El runner se instala como servicio dedicado con las etiquetas `self-hosted,linux,x64,cataloguer-prod`. Su cuenta necesita acceso al socket Docker y permiso `sudo` sin contraseña únicamente para `/opt/cataloguer/deploy-release.sh`; no se deben ejecutar pull requests ni workflows de forks en este runner.
+
+`concurrency` serializa releases: un segundo push espera al primero y nunca compite por las migraciones. En el servidor, `flock` añade una segunda barrera frente a ejecuciones manuales simultáneas.
+
 ## 7. Deuda técnica de infraestructura
 
 ### P0
 
-- **CI/CD para backend y recursos operativos:** lint, typecheck, pruebas críticas, imagen inmutable, migración controlada, despliegue, health check y rollback. Autenticación efímera/OIDC; no access keys en CI.
 - Separar IAM de imágenes e IAM de backups; hoy ambas capacidades usan temporalmente `cataloguer-user` por restricciones/SCP de la organización.
 - Configurar/probar la revalidación de DesignHof.
 - Automatizar restore drills y alertar fallos.

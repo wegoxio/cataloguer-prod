@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,6 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -26,6 +28,8 @@ import { OrganizationMergeService } from './merge/organization-merge.service';
 import { UsersService } from '../users/users.service';
 import { assertGlobalPlatform } from '../auth/tenancy/tenant-assertions';
 import { isComplimentaryPlan } from '../stores/plans';
+import { ConfirmPlanChangeDto, RequestPlanChangeDto } from './dto/plan-change.dto';
+import { ClientAdministrationService } from './admin/client-administration.service';
 
 /**
  * Organizations are the platform's tenants, so only a real SUPER_ADMIN
@@ -42,7 +46,30 @@ export class OrganizationsController {
     private readonly organizationMergeService: OrganizationMergeService,
     private readonly usersService: UsersService,
     private readonly onboardingService: OrganizationOnboardingService,
+    private readonly clientAdministrationService: ClientAdministrationService,
   ) {}
+
+  @Get(':id/client-details')
+  async clientDetails(@Req() req: any, @Param('id') id: string) {
+    assertGlobalPlatform(req.scope, 'Reading client administration details');
+    return { data: await this.clientAdministrationService.details(id) };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60 * 60_000 } })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+  @Post(':id/plan-change/challenges')
+  async requestPlanChange(@Req() req: any, @Param('id') id: string, @Body() dto: RequestPlanChangeDto) {
+    assertGlobalPlatform(req.scope, 'Requesting a client plan change');
+    return { data: await this.clientAdministrationService.requestPlanChange(id, dto.plan, req.user) };
+  }
+
+  @Throttle({ default: { limit: 10, ttl: 10 * 60_000 } })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
+  @Post(':id/plan-change/confirm')
+  async confirmPlanChange(@Req() req: any, @Param('id') id: string, @Body() dto: ConfirmPlanChangeDto) {
+    assertGlobalPlatform(req.scope, 'Confirming a client plan change');
+    return { data: await this.clientAdministrationService.confirmPlanChange(id, dto.challengeId, dto.code, req.user) };
+  }
 
   /**
    * Creates an organization's ORGANIZATION_MANAGER (Phase 4).
@@ -238,6 +265,7 @@ export class OrganizationsController {
   @Patch(':id')
   async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateOrganizationDto) {
     assertGlobalPlatform(req.scope, 'Editing an organization');
+    if (dto.plan !== undefined) throw new BadRequestException('Plan changes require email verification');
     return { data: await this.organizationsService.update(id, dto, req.user) };
   }
 
@@ -291,8 +319,8 @@ export class OrganizationsController {
    * every consequence, computed from current state. Unscoped platform owner
    * only, like the restoration itself.
    */
-    // At the boundary, before the service is reached: a refused caller learns
-    // nothing about the company's people. The service asserts again itself.
+  // At the boundary, before the service is reached: a refused caller learns
+  // nothing about the company's people. The service asserts again itself.
 
   /**
    * Restores an ordinarily archived company. Active again ONLY in the same

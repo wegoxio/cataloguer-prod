@@ -52,6 +52,7 @@ import { CatalogueChannel } from '../modules/catalogue-navigation/entities/catal
 import { CatalogueGroup } from '../modules/catalogue-navigation/entities/catalogue-group.entity';
 import { StoreCategoryPublication } from '../modules/catalogue-navigation/entities/store-category-publication.entity';
 import { CatalogueGroupCategory } from '../modules/catalogue-navigation/entities/catalogue-group-category.entity';
+import { PlanChangeChallenge } from '../modules/organizations/entities/plan-change-challenge.entity';
 
 // Load environment variables for CLI commands
 dotenv.config();
@@ -109,7 +110,8 @@ export default defineConfig({
     CatalogueChannel,
     CatalogueGroup,
     StoreCategoryPublication,
-      CatalogueGroupCategory,
+    CatalogueGroupCategory,
+    PlanChangeChallenge,
   ],
   clientUrl: process.env.DATABASE_URL,
   /*

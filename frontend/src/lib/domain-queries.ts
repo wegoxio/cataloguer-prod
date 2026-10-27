@@ -224,6 +224,32 @@ export function useOwnerOverview(token: string | null, enabled: boolean) {
   });
 }
 
+const clientDetailsResponseSchema = z.object({
+  data: z.object({
+    company: z.object({ id: z.string(), name: z.string(), slug: z.string(), status: z.string(), createdAt: z.coerce.string(), archivedAt: z.string().nullable(), defaultContentLocale: z.string() }),
+    plan: z.object({ key: z.string(), name: z.string(), priceUsd: z.number().nullable(), complimentary: z.boolean().optional(), maxWebsites: z.number().nullable(), maxTeamUsers: z.number().nullable(), stripeManaged: z.boolean(), subscriptionStatus: z.string().nullable(), nextChargeAt: z.coerce.string().nullable() }),
+    usage: z.object({ stores: z.number(), activeStores: z.number(), products: z.number(), publishedProducts: z.number(), categories: z.number(), teamUsers: z.number(), activeTeamUsers: z.number(), pendingInvitations: z.number() }),
+    commerce: z.object({ ordersTotal: z.number(), ordersThisMonth: z.number(), revenueThisMonth: z.number(), revenueTotal: z.number(), lastOrderAt: z.coerce.string().nullable(), paymentsCount: z.number(), totalPaid: z.number(), lastPaymentAt: z.coerce.string().nullable() }),
+    stores: z.array(z.object({ id: z.string(), name: z.string(), slug: z.string(), websiteUrl: z.string().nullable(), archivedAt: z.coerce.string().nullable(), createdAt: z.coerce.string() })),
+    managers: z.array(z.object({ id: z.string(), email: z.string(), firstName: z.string().nullable(), lastName: z.string().nullable(), deletedAt: z.coerce.string().nullable() })),
+    recentPayments: z.array(z.object({ id: z.string(), amountUsd: z.number(), description: z.string().nullable(), status: z.string(), paidAt: z.coerce.string().nullable(), invoiceUrl: z.string().nullable(), storeName: z.string() })),
+    availablePlans: z.array(z.object({ key: z.string(), name: z.string(), priceUsd: z.number().nullable(), maxWebsites: z.number().nullable().optional(), maxTeamUsers: z.number().nullable().optional(), complimentary: z.boolean().optional() }).passthrough()),
+  }),
+});
+export type ClientDetails = z.infer<typeof clientDetailsResponseSchema>['data'];
+
+export function useClientDetails(token: string | null, organizationId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.clientDetails(organizationId),
+    enabled: Boolean(token && organizationId && enabled),
+    queryFn: async (): Promise<ClientDetails> =>
+      (await apiFetchValidated(`/organizations/${organizationId}/client-details`, clientDetailsResponseSchema, {
+        method: 'GET',
+        token: token as string,
+      })).data,
+  });
+}
+
 export function useOwnerActivity(token: string | null, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.ownerActivity,
