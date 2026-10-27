@@ -33,14 +33,15 @@ jobs:
       - run: pnpm run typecheck
       # The repository is checked out with LF on Linux. Disable only the
       # legacy Prettier-as-ESLint rule; semantic/type lint rules still run.
-      - run: pnpm exec eslint "src/**/*.ts" --rule "prettier/prettier: off"
+      - run: >-
+          pnpm exec eslint "src/**/*.ts" --rule "prettier/prettier: off"
       - run: pnpm test -- --runInBand
       - run: pnpm run build
 
   deploy:
     name: Deploy to Lightsail
     needs: verify
-    runs-on: [self-hosted, linux, x64, cataloguer-prod]
+    runs-on: [self-hosted, Linux, X64, cataloguer-prod]
     environment: production
     timeout-minutes: 25
     steps:
