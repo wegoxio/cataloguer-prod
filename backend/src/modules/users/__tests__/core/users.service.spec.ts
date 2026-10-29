@@ -640,6 +640,20 @@ describe('UsersService', () => {
       expect(user.store).toBeNull();
       // Invited, not provisioned with a password: onboarding sets it.
       expect(user.pendingInvite).toBe(true);
+      expect(user.invitation).toEqual({ pending: true, deliveryStatus: 'DELIVERED' });
+    });
+
+    it('keeps the manager recoverable and reports a failed email delivery truthfully', async () => {
+      mockMail.send.mockResolvedValueOnce(false);
+
+      const user = await service.createOrganizationAdministrator(superAdmin, {
+        organizationId: 'org-1',
+        email: 'om@acme.com',
+      });
+
+      expect(user.id).toBeDefined();
+      expect(user.pendingInvite).toBe(true);
+      expect(user.invitation).toEqual({ pending: true, deliveryStatus: 'FAILED' });
     });
 
     it('counts a store-less organization manager as a plan seat', async () => {

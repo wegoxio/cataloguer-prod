@@ -11,8 +11,18 @@ import { PasswordResetToken } from '../auth/entities/password-reset-token.entity
 import { Store } from '../stores/entities/store.entity';
 import { Organization } from '../organizations/entities/organization.entity';
 import { TenantScope } from '../auth/tenancy/tenant-scope';
-import { assertGlobalPlatform, requireOrganizationScope, resolveScopedStoreTarget } from '../auth/tenancy/tenant-assertions';
-import { ORGANIZATION_ROLE, PLATFORM_ROLE, bindingOfUser, roleBindingError, userBindingError } from './authorization/role-levels';
+import {
+  assertGlobalPlatform,
+  requireOrganizationScope,
+  resolveScopedStoreTarget,
+} from '../auth/tenancy/tenant-assertions';
+import {
+  ORGANIZATION_ROLE,
+  PLATFORM_ROLE,
+  bindingOfUser,
+  roleBindingError,
+  userBindingError,
+} from './authorization/role-levels';
 import { canonicalEmail, canonicalEmailKey } from './identity/email-identity';
 import {
   AccessSnapshot,
@@ -459,7 +469,7 @@ export class UsersService {
       return created;
     });
 
-    await this.sendInviteEmail(user, actor);
+    const delivered = await this.sendInviteEmail(user, actor);
 
     await this.auditLogService.recordAuditEntry(
       actor.id,
@@ -472,7 +482,13 @@ export class UsersService {
       { organizationId: (user.organization as any)?.id ?? (user.organization as any) ?? null },
     );
 
-    return this.toSafeUser(user);
+    return {
+      ...this.toSafeUser(user),
+      invitation: {
+        pending: true,
+        deliveryStatus: delivered ? ('DELIVERED' as const) : ('FAILED' as const),
+      },
+    };
   }
 
   /**
@@ -614,12 +630,12 @@ export class UsersService {
     return this.toSafeUser(user);
   }
 
-  private async sendInviteEmail(user: User, actor: User): Promise<void> {
+  private async sendInviteEmail(user: User, actor: User): Promise<boolean> {
     // Delivered to the member AS RELOADED UNDER LOCK, never to the hint: an
     // address changed while the invitation waited must receive it, and the
     // old address must not.
     const issued = await this.issueInviteTokenSerialized(user);
-    await this.deliverInviteEmail(issued.recipient, actor, issued.token);
+    return this.deliverInviteEmail(issued.recipient, actor, issued.token);
   }
 
   /**

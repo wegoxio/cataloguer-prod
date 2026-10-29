@@ -88,7 +88,10 @@ export class ClientAdministrationService {
         [organizationId],
       ),
       this.em.getConnection().execute(
-        `select u.id, u.email, u.first_name as "firstName", u.last_name as "lastName", u.deleted_at as "deletedAt"
+        `select u.id, u.email, u.first_name as "firstName", u.last_name as "lastName", u.deleted_at as "deletedAt",
+                (u.password_hash is null) as "pendingInvite",
+                (select max(prt.expires_at) from password_reset_tokens prt
+                  where prt.user_id = u.id and prt.used_at is null) as "invitationExpiresAt"
            from users u join roles r on r.id = u.role_id
           where u.organization_id = ? and u.removed_at is null and r.name = 'ORGANIZATION_MANAGER'
           order by u.created_at asc`,

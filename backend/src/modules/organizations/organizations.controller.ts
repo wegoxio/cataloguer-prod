@@ -87,6 +87,7 @@ export class OrganizationsController {
   @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }))
   @Post(':id/administrators')
   async createAdministrator(@Req() req: any, @Param('id') id: string, @Body() dto: CreateOrganizationAdministratorDto) {
+    assertGlobalPlatform(req.scope, 'Inviting a client company administrator');
     const user = await this.usersService.createOrganizationAdministrator(req.user, {
       organizationId: id,
       email: dto.email,

@@ -231,7 +231,12 @@ const clientDetailsResponseSchema = z.object({
     usage: z.object({ stores: z.number(), activeStores: z.number(), products: z.number(), publishedProducts: z.number(), categories: z.number(), teamUsers: z.number(), activeTeamUsers: z.number(), pendingInvitations: z.number() }),
     commerce: z.object({ ordersTotal: z.number(), ordersThisMonth: z.number(), revenueThisMonth: z.number(), revenueTotal: z.number(), lastOrderAt: z.coerce.string().nullable(), paymentsCount: z.number(), totalPaid: z.number(), lastPaymentAt: z.coerce.string().nullable() }),
     stores: z.array(z.object({ id: z.string(), name: z.string(), slug: z.string(), websiteUrl: z.string().nullable(), archivedAt: z.coerce.string().nullable(), createdAt: z.coerce.string() })),
-    managers: z.array(z.object({ id: z.string(), email: z.string(), firstName: z.string().nullable(), lastName: z.string().nullable(), deletedAt: z.coerce.string().nullable() })),
+    managers: z.array(z.object({
+      id: z.string(), email: z.string(), firstName: z.string().nullable(), lastName: z.string().nullable(), deletedAt: z.coerce.string().nullable(),
+      // Defaults keep rolling frontend/backend deployments compatible whichever becomes live first.
+      pendingInvite: z.boolean().optional().default(false),
+      invitationExpiresAt: z.coerce.string().nullable().optional().default(null),
+    })),
     recentPayments: z.array(z.object({ id: z.string(), amountUsd: z.number(), description: z.string().nullable(), status: z.string(), paidAt: z.coerce.string().nullable(), invoiceUrl: z.string().nullable(), storeName: z.string() })),
     availablePlans: z.array(z.object({ key: z.string(), name: z.string(), priceUsd: z.number().nullable(), maxWebsites: z.number().nullable().optional(), maxTeamUsers: z.number().nullable().optional(), complimentary: z.boolean().optional() }).passthrough()),
   }),
