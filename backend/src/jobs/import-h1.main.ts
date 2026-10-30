@@ -6,6 +6,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
 import { MikroORM } from '@mikro-orm/postgresql';
 import readXlsxFile from 'read-excel-file/node';
+import * as sharpModule from 'sharp';
 import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { AppModule } from '../app.module';
 import { InventoryStockService } from '../modules/inventory/ledger/inventory-stock.service';
@@ -19,7 +20,7 @@ const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif']);
 const MAX_IMAGE_BYTES = 600 * 1024;
 // Sharp exposes a CommonJS callable while its current declarations are ESM-shaped
 // under this repository's legacy TypeScript module resolution.
-const sharp: any = require('sharp');
+const sharp: any = sharpModule;
 
 function args(argv: string[]) {
   const mode = (argv[0] ?? 'analyze') as Mode;
