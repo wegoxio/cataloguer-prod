@@ -1,0 +1,18 @@
+{
+  "ACCESORIOS": ["accesorios"],
+  "ALFOMBRAS": ["textiles-alfombras"],
+  "APARADORES": ["mobiliario-aparadores-bar"],
+  "BANCOS/PUFS": ["mobiliario-bancos-pouffs"],
+  "BAR": ["mobiliario-aparadores-bar"],
+  "BUTACAS": ["mobiliario-butacas"],
+  "CAMAS": ["mobiliario-camas"],
+  "CUADROS": ["accesorios"],
+  "ESTANTERÍAS": ["mobiliario-estanterias"],
+  "GAVETEROS/MESAS DE NOCHE": ["mobiliario-gavetero-mesas-de-noche"],
+  "ILUMINACIÓN": ["iluminacion"],
+  "MESA": ["mobiliario-mesas"],
+  "MESA DE COMEDOR": ["mobiliario-mesas-comedor"],
+  "MESAS DE CENTRO/AUXILIARES": ["mobiliario-mesas-centro", "mobiliario-mesas-auxiliares"],
+  "SILLAS/TABURETES": ["mobiliario-sillas-stools"],
+  "SOFÁS": ["mobiliario-sofas"]
+}

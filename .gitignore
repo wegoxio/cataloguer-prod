@@ -48,3 +48,7 @@ docs/DesignHof_woocommerce.csv
 
 # Client proposals (business docs, not code)
 proposals/
+
+# One-off H1 import source material (large/client-owned; never commit)
+/mercancia en transito H1.xlsx
+/Nuevo H1 Octubre 2026 CROP CUADRADO/

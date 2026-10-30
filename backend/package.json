@@ -28,7 +28,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:pg": "ALLOW_PG_DISPOSABLE_TESTS=1 jest --runInBand --testPathPattern='\\.pg\\.spec\\.ts$'",
-    "import:designhof": "node scripts/designhof-import.js"
+    "import:designhof": "node scripts/designhof-import.js",
+    "import:h1": "ts-node -r tsconfig-paths/register src/jobs/import-h1.main.ts",
+    "import:h1:prod": "node dist/jobs/import-h1.main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1081.0",
@@ -58,6 +60,7 @@
     "read-excel-file": "9.3.10",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.35.5",
     "stripe": "^22.3.1"
   },
   "devDependencies": {

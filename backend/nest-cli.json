@@ -8,6 +8,10 @@
       {
         "include": "modules/mail/templates/**/*.html",
         "outDir": "dist"
+      },
+      {
+        "include": "jobs/h1-*.json",
+        "outDir": "dist"
       }
     ],
     "watchAssets": true
