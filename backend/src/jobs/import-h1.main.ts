@@ -10,7 +10,7 @@ import * as sharpModule from 'sharp';
 import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { AppModule } from '../app.module';
 import { InventoryStockService } from '../modules/inventory/ledger/inventory-stock.service';
-import { ensureStoreCustodyIn } from '../modules/inventory/locations/inventory-location-provisioning';
+import { provisionOrganizationLocationsIn } from '../modules/inventory/locations/inventory-location-provisioning';
 import { CatalogueRevalidationService } from '../common/catalogue-revalidation/catalogue-revalidation.service';
 
 type Mode = 'analyze' | 'plan' | 'execute';
@@ -183,6 +183,34 @@ async function run() {
     report.status = 'PLANNED';
     if (options.mode === 'plan') return;
     if (options.confirmation !== CONFIRMATION) throw new Error(`Use --confirm ${CONFIRMATION} después de revisar el plan.`);
+
+    // Validate every ledger prerequisite before processing a single image.
+    // Organizations restored from the legacy database may legitimately lack
+    // both the default warehouse and branch custody rows.
+    await em.transactional(async (tx) => {
+      await tx.execute('select pg_advisory_xact_lock(hashtext(?))', [`h1-inventory-preflight:${organization.id}`]);
+      const [state]: Array<{ frozen: boolean }> = await tx.execute(
+        `select (inventory_cutover_frozen_at is not null) as frozen
+           from organizations where id = ?::uuid and removed_at is null`,
+        [organization.id],
+      );
+      if (!state) throw new Error('La organización dejó de existir antes de ejecutar la importación');
+      if (state.frozen) throw new Error('La organización está congelada para el corte de inventario; no se puede importar stock ordinario');
+      const locations = await provisionOrganizationLocationsIn(tx as any, organization.id);
+      const [storeCustody]: Array<{ id: string }> = await tx.execute(
+        `select id from inventory_locations
+          where organization_id = ?::uuid and store_id = ?::uuid and kind = 'STORE'`,
+        [organization.id, store.id],
+      );
+      if (!storeCustody) throw new Error('No fue posible preparar la custodia de inventario de la tienda');
+      report.inventoryInfrastructure = {
+        warehouseId: locations.warehouseId,
+        storeCustodyId: storeCustody.id,
+        createdLocationIds: locations.createdIds,
+      };
+    });
+    await checkpoint();
+
     const bucket = process.env.STORAGE_BUCKET; const region = process.env.STORAGE_REGION; const base = process.env.STORAGE_PUBLIC_URL;
     if (!bucket || !region || !base) throw new Error('Faltan STORAGE_BUCKET, STORAGE_REGION o STORAGE_PUBLIC_URL');
     const credentials = process.env.STORAGE_ACCESS_KEY_ID && process.env.STORAGE_SECRET_ACCESS_KEY ? { accessKeyId: process.env.STORAGE_ACCESS_KEY_ID, secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY } : undefined;
@@ -199,11 +227,6 @@ async function run() {
     const inventory = app.get(InventoryStockService) as InventoryStockService;
     await em.transactional(async (tx) => {
       const sql = tx.getConnection(); await sql.execute(`select pg_advisory_xact_lock(hashtext(?))`, [`h1-import:${organization.id}`]);
-      const custody = await ensureStoreCustodyIn(tx as any, organization.id, {
-        id: String(store.id),
-        name: String(store.name),
-      });
-      report.inventoryCustody = { locationId: custody.id, created: custody.created };
       for (const p of report.products) {
         if (p.action === 'CREATE') await sql.execute(`insert into products(id,name,slug,sku,manufacturer_code,status,sale_mode,organization_id,price,stock_quantity,track_inventory,created_at,updated_at) values(?::uuid,?,?,?,?,'PUBLISHED','DIRECT',?::uuid,?::numeric,?,true,now(),now())`, [p.id,p.name,p.slug,p.itemNumber,p.profitCode,organization.id,p.price,p.quantity]);
         else await sql.execute(`update products set name=?,sku=?,manufacturer_code=?,status='PUBLISHED',price=?::numeric,stock_quantity=?,track_inventory=true,archived_at=null,updated_at=now() where id=?::uuid and organization_id=?::uuid`, [p.name,p.itemNumber,p.profitCode,p.price,p.quantity,p.id,organization.id]);
