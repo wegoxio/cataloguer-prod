@@ -254,6 +254,14 @@ export default function StoresCard({
                     actor may not manage stay aligned but offer nothing. */}
                 {canManageAnyStore && (
                   <TD align="right" className="whitespace-nowrap space-x-1">
+                    {!store.archivedAt && (
+                      <Link
+                        href={`/dashboard/website/${store.id}`}
+                        className="inline-flex items-center rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/5"
+                      >
+                        Catálogo público
+                      </Link>
+                    )}
                     {!canManageStore(store.id) ? null : store.archivedAt ? (
                       <>
                         <Button size="sm" variant="secondary" tooltip={t('Reactivate this website')} onClick={() => handleRestore(store)}>
