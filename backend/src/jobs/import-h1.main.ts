@@ -112,7 +112,15 @@ async function optimize(file: string) {
 const urlFor = (base: string, key: string) => `${base.replace(/\/$/, '')}/${key.split('/').map(encodeURIComponent).join('/')}`;
 async function objectExists(s3: S3Client, bucket: string, key: string) {
   try { await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key })); return true; }
-  catch (e: any) { if (e?.$metadata?.httpStatusCode === 404 || e?.name === 'NotFound') return false; throw e; }
+  catch (e: any) {
+    const status = e?.$metadata?.httpStatusCode;
+    // S3 intentionally returns 403, not 404, for a missing key when the
+    // principal has object access but no ListBucket. The runtime role is kept
+    // that way so it cannot enumerate client assets. PutObject remains the
+    // authoritative credential/authorization check immediately afterwards.
+    if (status === 403 || status === 404 || e?.name === 'NotFound') return false;
+    throw e;
+  }
 }
 
 async function run() {
@@ -208,7 +216,13 @@ async function run() {
     await new Promise((resolve) => setTimeout(resolve, 3_500));
     report.status = 'EXECUTED';
   } catch (e: any) {
-    report.status = 'FAILED'; report.errors.push({ message: e?.message ?? String(e), stack: e?.stack }); process.exitCode = 1;
+    report.status = 'FAILED'; report.errors.push({
+      name: e?.name,
+      message: e?.message ?? String(e),
+      httpStatus: e?.$metadata?.httpStatusCode,
+      requestId: e?.$metadata?.requestId,
+      stack: e?.stack,
+    }); process.exitCode = 1;
     if (uploaded.length) try {
       const cleanupCredentials = process.env.STORAGE_ACCESS_KEY_ID && process.env.STORAGE_SECRET_ACCESS_KEY ? { accessKeyId: process.env.STORAGE_ACCESS_KEY_ID, secretAccessKey: process.env.STORAGE_SECRET_ACCESS_KEY } : undefined;
       const s3 = new S3Client({ region: process.env.STORAGE_REGION!, endpoint: process.env.STORAGE_ENDPOINT || undefined, forcePathStyle: Boolean(process.env.STORAGE_ENDPOINT), credentials: cleanupCredentials });
