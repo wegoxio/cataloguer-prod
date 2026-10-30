@@ -9,6 +9,7 @@ import { SalesService } from '../sales/sales.service';
 import {
   parsePublicCategoriesQuery,
   parsePublicLocaleQuery,
+  parsePublicProductSearchQuery,
   parsePublicProductDetailQuery,
   parsePublicProductsQuery,
   parsePublicSlug,
@@ -67,6 +68,31 @@ export class PublicCatalogueController {
       organizationId: req.catalogueOrganizationId ?? undefined,
       ...parsePublicProductsQuery(query),
     });
+  }
+
+  @RequireApiCapability('CATALOGUE_READ')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @Get('products/search')
+  async searchProducts(@Req() req: any, @Query() query: Record<string, unknown>) {
+    const parsed = parsePublicProductSearchQuery(query);
+    const result = await this.publicCatalogueService.getProducts({
+      storeId: req.catalogueStoreId ?? undefined,
+      organizationId: req.catalogueOrganizationId ?? undefined,
+      ...parsed,
+      sortBy: 'name',
+      sortDirection: 'asc',
+    });
+    return {
+      items: result.items.map((product) => ({
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        imageUrl: product.primaryImage?.url || product.images[0]?.url || null,
+        imageAlt: product.primaryImage?.altText || product.name,
+      })),
+      total: result.total,
+    };
   }
 
   // `?locale=` is EXPLICIT and OPTIONAL (P5-W2). Omitting it returns exactly

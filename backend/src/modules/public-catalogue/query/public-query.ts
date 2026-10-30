@@ -61,6 +61,7 @@ const PRODUCT_PARAMS = new Set([
 // `spec.<key>` parameters are recognized by prefix; see specFilters().
 const SPEC_PREFIX = 'spec.';
 const CATEGORY_PARAMS = new Set(['page', 'limit', 'sortBy', 'sortDirection', 'locale', 'channel', 'placement', 'group']);
+const SEARCH_PARAMS = new Set(['q', 'limit', 'locale', 'channel']);
 
 // BCP-47-shaped: `es`, `en-US`, `es-419`. Anything else is a typo, not a
 // preference the fallback chain should quietly reinterpret.
@@ -282,6 +283,27 @@ export interface PublicProductsQuery {
   specs?: Record<string, string[]>;
   channel?: string;
   group?: string;
+}
+
+export interface PublicProductSearchQuery {
+  search: string;
+  limit: number;
+  locale?: string;
+  channel?: string;
+}
+
+/** Compact typeahead contract used by storefront search boxes. */
+export function parsePublicProductSearchQuery(query: Record<string, unknown>): PublicProductSearchQuery {
+  rejectUnknown(query, SEARCH_PARAMS);
+  const search = term(query, 'q');
+  if (!search) {
+    throw new PublicQueryError('malformed_value', 'q', 'The q parameter is required');
+  }
+  const limit = positiveInt(query, 'limit') ?? 8;
+  if (limit < 1 || limit > 20) {
+    throw new PublicQueryError('malformed_value', 'limit', 'limit must be between 1 and 20');
+  }
+  return { search, limit, locale: locale(query), channel: key(query, 'channel') };
 }
 
 export function parsePublicProductsQuery(query: Record<string, unknown>): PublicProductsQuery {

@@ -3,6 +3,7 @@ import {
   parsePublicCategoriesQuery,
   parsePublicLocaleQuery,
   parsePublicProductDetailQuery,
+  parsePublicProductSearchQuery,
   parsePublicProductsQuery,
   parsePublicSlug,
 } from '../query/public-query';
@@ -175,6 +176,33 @@ describe('public query parsing (fail closed)', () => {
       for (const sortBy of ['createdAt', 'price', 'name']) {
         expect(parsePublicProductsQuery({ sortBy }).sortBy).toBe(sortBy);
       }
+    });
+  });
+
+  describe('product typeahead search', () => {
+    it('trims the term and applies the compact endpoint defaults', () => {
+      expect(parsePublicProductSearchQuery({ q: '  mesa nogal  ' })).toEqual({
+        search: 'mesa nogal', limit: 8, locale: undefined, channel: undefined,
+      });
+    });
+
+    it('accepts the bounded options used by a storefront', () => {
+      expect(parsePublicProductSearchQuery({ q: 'silla', limit: '20', locale: 'es-VE', channel: 'mobiliario-h1' })).toEqual({
+        search: 'silla', limit: 20, locale: 'es-VE', channel: 'mobiliario-h1',
+      });
+    });
+
+    it.each([
+      [{}, 'q', 'malformed_value'],
+      [{ q: 'a' }, 'q', 'malformed_value'],
+      [{ q: ['mesa', 'silla'] }, 'q', 'repeated_parameter'],
+      [{ q: 'mesa', limit: '0' }, 'limit', 'malformed_value'],
+      [{ q: 'mesa', limit: '21' }, 'limit', 'malformed_value'],
+      [{ q: 'mesa', locale: 'es_ES' }, 'locale', 'malformed_value'],
+      [{ q: 'mesa', channel: 'Mobiliario H1' }, 'channel', 'malformed_value'],
+      [{ q: 'mesa', page: '2' }, 'page', 'unknown_parameter'],
+    ] as const)('refuses an ambiguous or unsupported query %#', (query, param, code) => {
+      expect(errorBody(() => parsePublicProductSearchQuery(query as Record<string, unknown>))).toMatchObject({ param, code });
     });
   });
 
