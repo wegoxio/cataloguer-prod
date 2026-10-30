@@ -33,7 +33,7 @@ describe('PublicCatalogueController capability classification', () => {
   it('sees the whole controller (the enumeration itself must not silently shrink)', () => {
     // If a route is ever removed or added this count moves, forcing whoever
     // touches the controller to re-read the classification below.
-    expect(routes).toHaveLength(8);
+    expect(routes).toHaveLength(9);
   });
 
   it('every HTTP route declares exactly one KNOWN capability', () => {
@@ -54,6 +54,7 @@ describe('PublicCatalogueController capability classification', () => {
       'GET /public/categories': 'CATALOGUE_READ',
       'GET /public/groups': 'CATALOGUE_READ',
       'GET /public/products': 'CATALOGUE_READ',
+      'GET /public/products/search': 'CATALOGUE_READ',
       'GET /public/products/:slug': 'CATALOGUE_READ',
       'GET /public/categories/:slug/products': 'CATALOGUE_READ',
       'GET /public/site': 'CATALOGUE_READ',
