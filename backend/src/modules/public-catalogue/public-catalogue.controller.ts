@@ -88,6 +88,8 @@ export class PublicCatalogueController {
         name: product.name,
         slug: product.slug,
         description: product.description,
+        price: product.price,
+        salePrice: product.salePrice,
         imageUrl: product.primaryImage?.url || product.images[0]?.url || null,
         imageAlt: product.primaryImage?.altText || product.name,
       })),
