@@ -10,6 +10,7 @@ import * as sharpModule from 'sharp';
 import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { AppModule } from '../app.module';
 import { InventoryStockService } from '../modules/inventory/ledger/inventory-stock.service';
+import { ensureStoreCustodyIn } from '../modules/inventory/locations/inventory-location-provisioning';
 import { CatalogueRevalidationService } from '../common/catalogue-revalidation/catalogue-revalidation.service';
 
 type Mode = 'analyze' | 'plan' | 'execute';
@@ -198,6 +199,11 @@ async function run() {
     const inventory = app.get(InventoryStockService) as InventoryStockService;
     await em.transactional(async (tx) => {
       const sql = tx.getConnection(); await sql.execute(`select pg_advisory_xact_lock(hashtext(?))`, [`h1-import:${organization.id}`]);
+      const custody = await ensureStoreCustodyIn(tx as any, organization.id, {
+        id: String(store.id),
+        name: String(store.name),
+      });
+      report.inventoryCustody = { locationId: custody.id, created: custody.created };
       for (const p of report.products) {
         if (p.action === 'CREATE') await sql.execute(`insert into products(id,name,slug,sku,manufacturer_code,status,sale_mode,organization_id,price,stock_quantity,track_inventory,created_at,updated_at) values(?::uuid,?,?,?,?,'PUBLISHED','DIRECT',?::uuid,?::numeric,?,true,now(),now())`, [p.id,p.name,p.slug,p.itemNumber,p.profitCode,organization.id,p.price,p.quantity]);
         else await sql.execute(`update products set name=?,sku=?,manufacturer_code=?,status='PUBLISHED',price=?::numeric,stock_quantity=?,track_inventory=true,archived_at=null,updated_at=now() where id=?::uuid and organization_id=?::uuid`, [p.name,p.itemNumber,p.profitCode,p.price,p.quantity,p.id,organization.id]);
