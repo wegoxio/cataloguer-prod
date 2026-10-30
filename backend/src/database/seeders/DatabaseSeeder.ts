@@ -4,13 +4,13 @@ import { Role } from '../../modules/users/entities/role.entity';
 import { User } from '../../modules/users/entities/user.entity';
 import { canonicalEmail, canonicalEmailKey } from '../../modules/users/identity/email-identity';
 import * as argon2 from 'argon2';
+import { CANONICAL_ROLES } from '../../modules/users/authorization/role-levels';
 
 export class DatabaseSeeder extends Seeder {
   async run(em: EntityManager): Promise<void> {
-    const rolesToCreate = ['SUPER_ADMIN', 'ADMIN', 'EDITOR', 'VIEWER'];
     const rolesMap: Record<string, Role> = {};
 
-    for (const roleName of rolesToCreate) {
+    for (const roleName of CANONICAL_ROLES) {
       let role = await em.findOne(Role, { name: roleName });
       if (!role) {
         role = em.create(Role, { name: roleName });

@@ -1,6 +1,17 @@
-import { isOrganizationLevel, roleBindingError, STORE_ROLES, userBindingError } from '../../authorization/role-levels';
+import {
+  CANONICAL_ROLES,
+  isOrganizationLevel,
+  roleBindingError,
+  STORE_ROLES,
+  userBindingError,
+} from '../../authorization/role-levels';
 
 describe('role bindings (P0-04)', () => {
+  it('defines the five persisted roles without spreading the legacy STORE_ADMIN alias', () => {
+    expect(CANONICAL_ROLES).toEqual(['SUPER_ADMIN', 'ORGANIZATION_MANAGER', 'ADMIN', 'EDITOR', 'VIEWER']);
+    expect(CANONICAL_ROLES).not.toContain('STORE_ADMIN');
+  });
+
   describe('only SUPER_ADMIN may be unbound', () => {
     it('accepts a SUPER_ADMIN with no organization and no store', () => {
       expect(roleBindingError('SUPER_ADMIN', {})).toBeNull();

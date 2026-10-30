@@ -21,6 +21,14 @@ export const ORGANIZATION_ROLE = 'ORGANIZATION_MANAGER';
 /** Pinned to exactly one branch. */
 export const STORE_ROLES = ['STORE_ADMIN', 'ADMIN', 'EDITOR', 'VIEWER'];
 
+/**
+ * Roles that every installation must persist. STORE_ADMIN is deliberately not
+ * here: it is a compatibility alias for historical rows, not a role that a
+ * fresh database or a current assignment flow may create.
+ */
+export const CANONICAL_ROLES = [PLATFORM_ROLE, ORGANIZATION_ROLE, 'ADMIN', 'EDITOR', 'VIEWER'] as const;
+
+/** All names the runtime can safely interpret, including the legacy alias. */
 export const ALL_ROLES = [PLATFORM_ROLE, ORGANIZATION_ROLE, ...STORE_ROLES];
 
 export interface RoleBinding {

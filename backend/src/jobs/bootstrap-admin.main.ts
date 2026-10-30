@@ -4,8 +4,7 @@ import databaseConfig from '../database/mikro-orm.config';
 import { Role } from '../modules/users/entities/role.entity';
 import { User } from '../modules/users/entities/user.entity';
 import { canonicalEmail, canonicalEmailKey } from '../modules/users/identity/email-identity';
-
-const ROLE_NAMES = ['SUPER_ADMIN', 'ORGANIZATION_MANAGER', 'ADMIN', 'EDITOR', 'VIEWER'] as const;
+import { CANONICAL_ROLES } from '../modules/users/authorization/role-levels';
 
 async function bootstrapAdmin(): Promise<void> {
   const inputEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
@@ -28,7 +27,7 @@ async function bootstrapAdmin(): Promise<void> {
 
   try {
     const roles = new Map<string, Role>();
-    for (const name of ROLE_NAMES) {
+    for (const name of CANONICAL_ROLES) {
       let role = await em.findOne(Role, { name });
       if (!role) {
         role = em.create(Role, { name });
