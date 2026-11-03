@@ -179,15 +179,21 @@ async function ensureCategory(
   definition: { slug: string; name: string; order: number },
   parentId: string,
 ) {
-  const result = await db.query<{ id: string }>(
-    `insert into categories(id,name,slug,organization_id,parent_category_id,kind,sort_order,show_in_navigation,created_at,updated_at)
-     values(gen_random_uuid(),$1,$2,$3,$4,'PRODUCT_TYPE',$5,true,now(),now())
-     on conflict (organization_id,slug) where removed_at is null
-     do update set name=excluded.name,parent_category_id=excluded.parent_category_id,kind='PRODUCT_TYPE',
-       sort_order=excluded.sort_order,show_in_navigation=true,archived_at=null,updated_at=now()
-     returning id`,
-    [definition.name, definition.slug, organizationId, parentId, definition.order],
+  const existing = await db.query<{ id: string }>(
+    `select id from categories where organization_id=$1 and slug=$2 and removed_at is null limit 1`,
+    [organizationId, definition.slug],
   );
+  const result = existing.rowCount
+    ? await db.query<{ id: string }>(
+        `update categories set name=$1,parent_category_id=$2,kind='PRODUCT_TYPE',sort_order=$3,
+           show_in_navigation=true,archived_at=null,updated_at=now() where id=$4 returning id`,
+        [definition.name, parentId, definition.order, existing.rows[0].id],
+      )
+    : await db.query<{ id: string }>(
+        `insert into categories(id,name,slug,organization_id,parent_category_id,kind,sort_order,show_in_navigation,created_at,updated_at)
+         values(gen_random_uuid(),$1,$2,$3,$4,'PRODUCT_TYPE',$5,true,now(),now()) returning id`,
+        [definition.name, definition.slug, organizationId, parentId, definition.order],
+      );
   return result.rows[0].id;
 }
 
