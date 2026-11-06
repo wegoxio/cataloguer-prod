@@ -1,4 +1,17 @@
-import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength, Min } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { CATALOGUE_PLACEMENTS, CataloguePlacement } from '../entities/store-category-publication.entity';
 import { CATALOGUE_GROUP_PURPOSES, CatalogueGroupPurpose } from '../entities/catalogue-group.entity';
 
@@ -44,9 +57,16 @@ export class SetGroupCategoriesDto {
   @IsArray() @ArrayUnique() @IsUUID('4', { each: true }) categoryIds!: string[];
 }
 
+export class ReorderGroupsDto {
+  @IsArray() @ArrayUnique() @IsUUID('4', { each: true }) groupIds!: string[];
+}
+
 export class UpsertCategoryPublicationDto {
   @IsBoolean() @IsOptional() visible?: boolean;
-  @IsArray() @ArrayUnique() @IsIn(CATALOGUE_PLACEMENTS, { each: true }) @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(CATALOGUE_PLACEMENTS, { each: true })
+  @IsOptional()
   placements?: CataloguePlacement[];
   @IsString() @MaxLength(160) @IsOptional() publicLabel?: string | null;
   @IsInt() @Min(0) @IsOptional() sortOrder?: number;

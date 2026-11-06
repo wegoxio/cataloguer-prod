@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../../../lib/api-client';
 import Button from '../../../components/ui/button';
 import Input from '../../../components/ui/input';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 type Ref = string | { id: string };
 type Channel = { id: string; key: string; name: string; active: boolean; isDefault: boolean };
@@ -16,6 +17,7 @@ type Group = {
   channel: Ref;
   coverProduct?: Ref | null;
   active: boolean;
+  sortOrder: number;
 };
 type Publication = {
   id: string;
@@ -96,6 +98,12 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
     () => (snapshot?.groups ?? []).filter((item) => idOf(item.channel) === channelId),
     [snapshot, channelId],
   );
+  const navigationGroups = useMemo(
+    () => groups
+      .filter((group) => group.purpose === 'NAVIGATION' && group.active)
+      .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
+    [groups],
+  );
   const memberIds = useMemo(() => new Set(
     (snapshot?.memberships ?? []).filter((item) => item.groupId === selectedGroup).map((item) => item.categoryId),
   ), [snapshot, selectedGroup]);
@@ -103,6 +111,16 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const productsForCategory = (categoryId: string) => products.filter((product) =>
     (product.categories ?? []).some((category) => idOf(category) === categoryId),
   );
+  const moveNavigationGroup = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= navigationGroups.length) return;
+    const reordered = [...navigationGroups];
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    void mutate(() => apiFetch(
+      `/stores/${storeId}/catalogue-navigation/channels/${channelId}/groups/order`,
+      { method: 'PUT', token, body: JSON.stringify({ groupIds: reordered.map((group) => group.id) }) },
+    ));
+  };
 
   if (!snapshot) {
     return <div className="rounded-md border border-slate-200 bg-white p-5 text-sm text-slate-500">Cargando configuración de tienda…</div>;
@@ -136,6 +154,38 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
       </label>
 
       {channelId && <>
+        <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-4">
+          <h4 className="text-sm font-semibold text-slate-800">Orden de categorias en el sitio</h4>
+          <p className="mt-1 text-xs text-slate-500">
+            Este orden se aplica solo al canal seleccionado. La primera categoria aparecera primero en DesignHof.
+          </p>
+          <div className="mt-3 space-y-2">
+            {navigationGroups.length === 0 ? (
+              <p className="rounded border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500">
+                Este canal aun no tiene grupos de navegacion activos.
+              </p>
+            ) : navigationGroups.map((group, index) => (
+              <div key={group.id} className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-700">{group.name}</p>
+                  <p className="truncate text-[11px] text-slate-400">{group.key}</p>
+                </div>
+                <div className="flex gap-1">
+                  <button type="button" aria-label={`Subir ${group.name}`} title="Mover arriba" disabled={busy || index === 0} onClick={() => moveNavigationGroup(index, -1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
+                    <ChevronUp className="h-4 w-4" />
+                  </button>
+                  <button type="button" aria-label={`Bajar ${group.name}`} title="Mover abajo" disabled={busy || index === navigationGroups.length - 1} onClick={() => moveNavigationGroup(index, 1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div>
           <h4 className="mb-1 text-sm font-semibold text-slate-700">Categorías publicadas</h4>
           <p className="mb-3 text-xs text-slate-500">La imagen propia de la categoría tiene prioridad. El producto de portada se conserva únicamente como respaldo para categorías antiguas sin imagen.</p>
