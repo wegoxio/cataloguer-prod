@@ -173,7 +173,7 @@ describe('public query parsing (fail closed)', () => {
         const body = errorBody(() => parsePublicProductsQuery({ sortBy }));
         expect(body).toMatchObject({ code: 'unsupported_sort', param: 'sortBy' });
       }
-      for (const sortBy of ['createdAt', 'price', 'name']) {
+      for (const sortBy of ['catalogue', 'createdAt', 'price', 'name']) {
         expect(parsePublicProductsQuery({ sortBy }).sortBy).toBe(sortBy);
       }
     });

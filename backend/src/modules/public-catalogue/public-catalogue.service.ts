@@ -1027,13 +1027,42 @@ export class PublicCatalogueService {
     const sortBy = options?.sortBy || 'createdAt';
     const sortDirection = options?.sortDirection || 'desc';
 
+    // The storefront's default order follows the navigation configured for
+    // this exact branch/channel. A product may also belong to merchandising
+    // categories such as NEW IN; those memberships must never put it ahead of
+    // products in the first configured navigation group. Products outside all
+    // active CATALOG navigation groups sort last. The composite rank preserves
+    // both group order and category order and remains stable across pages.
+    const catalogueRank =
+      sortBy === 'catalogue' && options?.storeId && options.channel
+        ? raw((alias) => {
+            const storeId = options.storeId!;
+            const channel = options.channel!;
+            return `coalesce((select min((g.sort_order::bigint * 1000000) + gc.sort_order::bigint)
+              from product_categories pc
+              join catalogue_group_categories gc on gc.category_id = pc.category_id
+              join catalogue_groups g on g.id = gc.group_id
+              join catalogue_channels ch on ch.id = g.channel_id
+              join store_category_publications cp on cp.category_id = pc.category_id
+                and cp.channel_id = g.channel_id and cp.store_id = g.store_id and cp.visible = true
+              where pc.product_id = ${alias}.id
+                and g.store_id = '${storeId}'::uuid
+                and ch.key = '${channel}'
+                and ch.active = true and g.active = true
+                and g.purpose = 'NAVIGATION'
+                and g.placements @> '["CATALOG"]'::jsonb), 9223372036854775807)`;
+          })
+        : null;
+
     const [products, total] = await this.productRepository.findAndCount(where, {
       populate: ['categories', 'images', 'branchLinks', 'children', 'children.images', 'children.branchLinks'],
       limit,
       offset,
       // id tie-break on every sort (Phase 6): a page boundary through equal
       // prices or names must never duplicate or drop a product between pages.
-      orderBy: { [sortBy]: sortDirection, id: sortDirection } as never,
+      orderBy: catalogueRank
+        ? ({ [catalogueRank]: 'asc', name: 'asc', id: 'asc' } as never)
+        : ({ [sortBy]: sortDirection, id: sortDirection } as never),
     });
 
     const fieldsByProduct = await this.publicFieldsByProduct(

@@ -38,7 +38,7 @@ export class PublicQueryError extends BadRequestException {
 }
 
 /** The only columns a public consumer may sort products by. */
-export const PUBLIC_PRODUCT_SORTS = ['createdAt', 'price', 'name'] as const;
+export const PUBLIC_PRODUCT_SORTS = ['catalogue', 'createdAt', 'price', 'name'] as const;
 /** The only columns a public consumer may sort categories by. */
 export const PUBLIC_CATEGORY_SORTS = ['sortOrder', 'name', 'createdAt'] as const;
 
