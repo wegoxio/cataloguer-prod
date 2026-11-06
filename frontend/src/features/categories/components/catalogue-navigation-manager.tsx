@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/api-client';
 import Button from '../../../components/ui/button';
 import Input from '../../../components/ui/input';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, RotateCcw, Save } from 'lucide-react';
 
 type Ref = string | { id: string };
 type Channel = { id: string; key: string; name: string; active: boolean; isDefault: boolean };
@@ -50,6 +50,9 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const [selectedGroup, setSelectedGroup] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orderDrafts, setOrderDrafts] = useState<Record<string, string[]>>({});
+  const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null);
+  const lastDragTargetId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const [navigation, firstCategoryPage, firstProductPage] = await Promise.all([
@@ -104,6 +107,18 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
       .sort((left, right) => left.sortOrder - right.sortOrder || left.name.localeCompare(right.name)),
     [groups],
   );
+  const persistedOrderIds = useMemo(() => navigationGroups.map((group) => group.id), [navigationGroups]);
+  const draftOrderIds = orderDrafts[channelId] ?? persistedOrderIds;
+  const orderedNavigationGroups = useMemo(() => {
+    const byId = new Map(navigationGroups.map((group) => [group.id, group]));
+    return [
+      ...draftOrderIds.map((id) => byId.get(id)).filter((group): group is Group => Boolean(group)),
+      ...navigationGroups.filter((group) => !draftOrderIds.includes(group.id)),
+    ];
+  }, [draftOrderIds, navigationGroups]);
+  const orderedGroupIds = orderedNavigationGroups.map((group) => group.id);
+  const orderChanged = orderedGroupIds.length === persistedOrderIds.length
+    && orderedGroupIds.some((id, index) => id !== persistedOrderIds[index]);
   const memberIds = useMemo(() => new Set(
     (snapshot?.memberships ?? []).filter((item) => item.groupId === selectedGroup).map((item) => item.categoryId),
   ), [snapshot, selectedGroup]);
@@ -111,15 +126,42 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const productsForCategory = (categoryId: string) => products.filter((product) =>
     (product.categories ?? []).some((category) => idOf(category) === categoryId),
   );
+  const setDraftOrder = (groupIds: string[]) => {
+    setOrderDrafts((current) => ({ ...current, [channelId]: groupIds }));
+  };
   const moveNavigationGroup = (index: number, direction: -1 | 1) => {
     const target = index + direction;
-    if (target < 0 || target >= navigationGroups.length) return;
-    const reordered = [...navigationGroups];
+    if (target < 0 || target >= orderedNavigationGroups.length) return;
+    const reordered = orderedNavigationGroups.map((group) => group.id);
     [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
-    void mutate(() => apiFetch(
-      `/stores/${storeId}/catalogue-navigation/channels/${channelId}/groups/order`,
-      { method: 'PUT', token, body: JSON.stringify({ groupIds: reordered.map((group) => group.id) }) },
-    ));
+    setDraftOrder(reordered);
+  };
+  const moveDraggedGroup = (targetId: string) => {
+    if (!draggingGroupId || draggingGroupId === targetId || lastDragTargetId.current === targetId) return;
+    lastDragTargetId.current = targetId;
+    const reordered = orderedNavigationGroups.map((group) => group.id);
+    const from = reordered.indexOf(draggingGroupId);
+    const to = reordered.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    reordered.splice(to, 0, reordered.splice(from, 1)[0]);
+    setDraftOrder(reordered);
+  };
+  const resetDraftOrder = () => {
+    setOrderDrafts((current) => {
+      const next = { ...current };
+      delete next[channelId];
+      return next;
+    });
+  };
+  const saveDraftOrder = () => {
+    const groupIds = orderedNavigationGroups.map((group) => group.id);
+    void mutate(async () => {
+      await apiFetch(
+        `/stores/${storeId}/catalogue-navigation/channels/${channelId}/groups/order`,
+        { method: 'PUT', token, body: JSON.stringify({ groupIds }) },
+      );
+      resetDraftOrder();
+    });
   };
 
   if (!snapshot) {
@@ -156,16 +198,37 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
       {channelId && <>
         <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-4">
           <h4 className="text-sm font-semibold text-slate-800">Orden de categorias en el sitio</h4>
-          <p className="mt-1 text-xs text-slate-500">
-            Este orden se aplica solo al canal seleccionado. La primera categoria aparecera primero en DesignHof.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="mt-1 max-w-2xl text-xs text-slate-500">
+              Arrastra las categorias hasta obtener el orden deseado. Nada se modifica en DesignHof hasta pulsar Guardar orden.
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" variant="secondary" disabled={busy || !orderChanged} onClick={resetDraftOrder}>
+                <RotateCcw className="h-3.5 w-3.5" /> Descartar
+              </Button>
+              <Button type="button" size="sm" disabled={busy || !orderChanged} isLoading={busy} onClick={saveDraftOrder}>
+                <Save className="h-3.5 w-3.5" /> Guardar orden
+              </Button>
+            </div>
+          </div>
+          {orderChanged && <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Tienes cambios de orden sin guardar.</p>}
           <div className="mt-3 space-y-2">
             {navigationGroups.length === 0 ? (
               <p className="rounded border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500">
                 Este canal aun no tiene grupos de navegacion activos.
               </p>
-            ) : navigationGroups.map((group, index) => (
-              <div key={group.id} className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
+            ) : orderedNavigationGroups.map((group, index) => (
+              <div
+                key={group.id}
+                draggable={!busy}
+                onDragStart={(event) => { lastDragTargetId.current = null; setDraggingGroupId(group.id); event.dataTransfer.effectAllowed = 'move'; }}
+                onDragEnter={() => moveDraggedGroup(group.id)}
+                onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
+                onDragEnd={() => { lastDragTargetId.current = null; setDraggingGroupId(null); }}
+                onDrop={(event) => { event.preventDefault(); lastDragTargetId.current = null; setDraggingGroupId(null); }}
+                className={`flex cursor-grab items-center gap-3 rounded-md border bg-white px-3 py-2 shadow-sm transition duration-150 active:cursor-grabbing ${draggingGroupId === group.id ? 'scale-[0.99] border-blue-300 bg-blue-50 opacity-60' : 'border-slate-200 hover:border-blue-200'}`}
+              >
+                <GripVertical className="h-5 w-5 shrink-0 text-slate-300" aria-hidden="true" />
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
                   {index + 1}
                 </span>
@@ -177,7 +240,7 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                   <button type="button" aria-label={`Subir ${group.name}`} title="Mover arriba" disabled={busy || index === 0} onClick={() => moveNavigationGroup(index, -1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
                     <ChevronUp className="h-4 w-4" />
                   </button>
-                  <button type="button" aria-label={`Bajar ${group.name}`} title="Mover abajo" disabled={busy || index === navigationGroups.length - 1} onClick={() => moveNavigationGroup(index, 1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
+                  <button type="button" aria-label={`Bajar ${group.name}`} title="Mover abajo" disabled={busy || index === orderedNavigationGroups.length - 1} onClick={() => moveNavigationGroup(index, 1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
                     <ChevronDown className="h-4 w-4" />
                   </button>
                 </div>
