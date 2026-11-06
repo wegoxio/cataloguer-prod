@@ -59,6 +59,7 @@ export class SetGroupCategoriesDto {
 
 export class ReorderGroupsDto {
   @IsArray() @ArrayUnique() @IsUUID('4', { each: true }) groupIds!: string[];
+  @IsArray() @ArrayUnique() @IsUUID('4', { each: true }) @IsOptional() visibleGroupIds?: string[];
 }
 
 export class UpsertCategoryPublicationDto {

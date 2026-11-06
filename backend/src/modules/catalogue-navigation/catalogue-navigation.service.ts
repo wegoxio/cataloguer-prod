@@ -163,10 +163,20 @@ export class CatalogueNavigationService {
         'The order must contain every active navigation group in this channel exactly once',
       );
     }
+    const visibleIds = dto.visibleGroupIds ? new Set(dto.visibleGroupIds) : null;
+    if (visibleIds && [...visibleIds].some((id) => !availableIds.has(id))) {
+      throw new BadRequestException('Every visible group must belong to this navigation channel');
+    }
     const byId = new Map(groups.map((group) => [group.id, group]));
     dto.groupIds.forEach((id, sortOrder) => {
       const group = byId.get(id)!;
       group.sortOrder = sortOrder;
+      if (visibleIds) {
+        const placements = new Set(group.placements);
+        if (visibleIds.has(id)) placements.add('CATALOG');
+        else placements.delete('CATALOG');
+        group.placements = [...placements];
+      }
       group.updatedAt = new Date();
     });
     await this.em.flush();

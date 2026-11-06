@@ -51,6 +51,7 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string[]>>({});
+  const [visibilityDrafts, setVisibilityDrafts] = useState<Record<string, string[]>>({});
   const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null);
   const lastDragTargetId = useRef<string | null>(null);
 
@@ -108,7 +109,12 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
     [groups],
   );
   const persistedOrderIds = useMemo(() => navigationGroups.map((group) => group.id), [navigationGroups]);
+  const persistedVisibleIds = useMemo(
+    () => navigationGroups.filter((group) => group.placements.includes('CATALOG')).map((group) => group.id),
+    [navigationGroups],
+  );
   const draftOrderIds = orderDrafts[channelId] ?? persistedOrderIds;
+  const draftVisibleIds = visibilityDrafts[channelId] ?? persistedVisibleIds;
   const orderedNavigationGroups = useMemo(() => {
     const byId = new Map(navigationGroups.map((group) => [group.id, group]));
     return [
@@ -119,6 +125,9 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const orderedGroupIds = orderedNavigationGroups.map((group) => group.id);
   const orderChanged = orderedGroupIds.length === persistedOrderIds.length
     && orderedGroupIds.some((id, index) => id !== persistedOrderIds[index]);
+  const visibilityChanged = draftVisibleIds.length !== persistedVisibleIds.length
+    || draftVisibleIds.some((id) => !persistedVisibleIds.includes(id));
+  const navigationConfigurationChanged = orderChanged || visibilityChanged;
   const memberIds = useMemo(() => new Set(
     (snapshot?.memberships ?? []).filter((item) => item.groupId === selectedGroup).map((item) => item.categoryId),
   ), [snapshot, selectedGroup]);
@@ -152,13 +161,24 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
       delete next[channelId];
       return next;
     });
+    setVisibilityDrafts((current) => {
+      const next = { ...current };
+      delete next[channelId];
+      return next;
+    });
+  };
+  const toggleGroupVisibility = (groupId: string) => {
+    const visible = new Set(draftVisibleIds);
+    if (visible.has(groupId)) visible.delete(groupId);
+    else visible.add(groupId);
+    setVisibilityDrafts((current) => ({ ...current, [channelId]: [...visible] }));
   };
   const saveDraftOrder = () => {
     const groupIds = orderedNavigationGroups.map((group) => group.id);
     void mutate(async () => {
       await apiFetch(
         `/stores/${storeId}/catalogue-navigation/channels/${channelId}/groups/order`,
-        { method: 'PUT', token, body: JSON.stringify({ groupIds }) },
+        { method: 'PUT', token, body: JSON.stringify({ groupIds, visibleGroupIds: draftVisibleIds }) },
       );
       resetDraftOrder();
     });
@@ -200,18 +220,18 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
           <h4 className="text-sm font-semibold text-slate-800">Orden de categorias en el sitio</h4>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="mt-1 max-w-2xl text-xs text-slate-500">
-              Arrastra las categorias hasta obtener el orden deseado. Nada se modifica en DesignHof hasta pulsar Guardar orden.
+              Elige cuáles aparecen en este catálogo y arrástralas hasta obtener el orden deseado. Nada se modifica en DesignHof hasta pulsar Guardar configuración.
             </p>
             <div className="flex gap-2">
-              <Button type="button" size="sm" variant="secondary" disabled={busy || !orderChanged} onClick={resetDraftOrder}>
+              <Button type="button" size="sm" variant="secondary" disabled={busy || !navigationConfigurationChanged} onClick={resetDraftOrder}>
                 <RotateCcw className="h-3.5 w-3.5" /> Descartar
               </Button>
-              <Button type="button" size="sm" disabled={busy || !orderChanged} isLoading={busy} onClick={saveDraftOrder}>
-                <Save className="h-3.5 w-3.5" /> Guardar orden
+              <Button type="button" size="sm" disabled={busy || !navigationConfigurationChanged} isLoading={busy} onClick={saveDraftOrder}>
+                <Save className="h-3.5 w-3.5" /> Guardar configuración
               </Button>
             </div>
           </div>
-          {orderChanged && <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Tienes cambios de orden sin guardar.</p>}
+          {navigationConfigurationChanged && <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Tienes cambios de navegación sin guardar.</p>}
           <div className="mt-3 space-y-2">
             {navigationGroups.length === 0 ? (
               <p className="rounded border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500">
@@ -226,7 +246,7 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                 onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }}
                 onDragEnd={() => { lastDragTargetId.current = null; setDraggingGroupId(null); }}
                 onDrop={(event) => { event.preventDefault(); lastDragTargetId.current = null; setDraggingGroupId(null); }}
-                className={`flex cursor-grab items-center gap-3 rounded-md border bg-white px-3 py-2 shadow-sm transition duration-150 active:cursor-grabbing ${draggingGroupId === group.id ? 'scale-[0.99] border-blue-300 bg-blue-50 opacity-60' : 'border-slate-200 hover:border-blue-200'}`}
+                className={`flex cursor-grab items-center gap-3 rounded-md border px-3 py-2 shadow-sm transition duration-150 active:cursor-grabbing ${draggingGroupId === group.id ? 'scale-[0.99] border-blue-300 bg-blue-50 opacity-60' : draftVisibleIds.includes(group.id) ? 'border-slate-200 bg-white hover:border-blue-200' : 'border-slate-200 bg-slate-50 opacity-60'}`}
               >
                 <GripVertical className="h-5 w-5 shrink-0 text-slate-300" aria-hidden="true" />
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700">
@@ -236,6 +256,10 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                   <p className="truncate text-sm font-semibold text-slate-700">{group.name}</p>
                   <p className="truncate text-[11px] text-slate-400">{group.key}</p>
                 </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600" onPointerDown={(event) => event.stopPropagation()}>
+                  <input type="checkbox" checked={draftVisibleIds.includes(group.id)} disabled={busy} onChange={() => toggleGroupVisibility(group.id)} />
+                  Mostrar
+                </label>
                 <div className="flex gap-1">
                   <button type="button" aria-label={`Subir ${group.name}`} title="Mover arriba" disabled={busy || index === 0} onClick={() => moveNavigationGroup(index, -1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
                     <ChevronUp className="h-4 w-4" />
