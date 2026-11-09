@@ -228,6 +228,111 @@ export class CatalogueNavigationService {
     return this.snapshot(organizationId, storeId);
   }
 
+  async addCategoryToNavigation(
+    organizationId: string,
+    storeId: string,
+    channelId: string,
+    categoryId: string,
+  ) {
+    const groupId = await this.em.transactional(async (em) => {
+      const channel = await em.findOne(CatalogueChannel, {
+        id: channelId,
+        organization: organizationId,
+        store: storeId,
+        active: true,
+      });
+      if (!channel) throw new NotFoundException('Catalogue channel not found');
+      const category = await em.findOne(Category, {
+        id: categoryId,
+        organization: organizationId,
+        archivedAt: null,
+      });
+      if (!category) throw new NotFoundException('Category not found');
+
+      let publication = await em.findOne(StoreCategoryPublication, { store: storeId, channel, category });
+      if (!publication) {
+        publication = em.create(StoreCategoryPublication, {
+          organization: organizationId as any,
+          store: storeId as any,
+          channel,
+          category,
+          visible: true,
+          placements: ['HOME', 'CATALOG', 'NAVIGATION'],
+          sortOrder: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+        em.persist(publication);
+      } else {
+        publication.visible = true;
+        publication.placements = [
+          ...new Set([...publication.placements, 'HOME', 'CATALOG', 'NAVIGATION'] as const),
+        ];
+        publication.updatedAt = new Date();
+      }
+
+      const existingMembership = await em.findOne(
+        CatalogueGroupCategory,
+        {
+          organization: organizationId,
+          store: storeId,
+          category,
+          group: { channel, purpose: 'NAVIGATION', active: true },
+        },
+        { populate: ['group'] },
+      );
+      if (existingMembership) {
+        const existingGroup = existingMembership.group;
+        existingGroup.placements = [...new Set([...existingGroup.placements, 'CATALOG'] as const)];
+        existingGroup.updatedAt = new Date();
+        await em.flush();
+        return existingGroup.id;
+      }
+
+      const existingGroups = await em.find(
+        CatalogueGroup,
+        { organization: organizationId, store: storeId, channel },
+        { orderBy: { sortOrder: 'desc', id: 'asc' } },
+      );
+      const existingKeys = new Set(existingGroups.map((group) => group.key));
+      const baseKey = category.slug.slice(0, 80);
+      let key = baseKey;
+      let suffix = 2;
+      while (existingKeys.has(key)) {
+        const ending = `-${suffix++}`;
+        key = `${baseKey.slice(0, 80 - ending.length)}${ending}`;
+      }
+      const navigationSortOrders = existingGroups
+        .filter((group) => group.purpose === 'NAVIGATION' && group.active)
+        .map((group) => group.sortOrder);
+      const group = em.create(CatalogueGroup, {
+        organization: organizationId as any,
+        store: storeId as any,
+        channel,
+        key,
+        name: category.publicLabel?.trim() || category.name,
+        purpose: 'NAVIGATION',
+        placements: ['HOME', 'CATALOG', 'NAVIGATION'],
+        active: true,
+        sortOrder: navigationSortOrders.length ? Math.max(...navigationSortOrders) + 1 : 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      em.persist(group);
+      em.persist(em.create(CatalogueGroupCategory, {
+        organization: organizationId as any,
+        store: storeId as any,
+        group,
+        category,
+        sortOrder: 0,
+        createdAt: new Date(),
+      }));
+      await em.flush();
+      return group.id;
+    });
+    return { groupId };
+  }
+
   async upsertPublication(
     organizationId: string,
     storeId: string,

@@ -78,6 +78,17 @@ export class CatalogueNavigationController {
     const s = this.scope(req, requested);
     return this.service.setGroupCategories(s.organizationId, s.storeId, id, dto).then((data) => ({ data }));
   }
+  @Post('channels/:channelId/navigation/categories/:categoryId') addCategoryToNavigation(
+    @Req() req: any,
+    @Param('storeId') requested: string,
+    @Param('channelId') channelId: string,
+    @Param('categoryId') categoryId: string,
+  ) {
+    const s = this.scope(req, requested);
+    return this.service
+      .addCategoryToNavigation(s.organizationId, s.storeId, channelId, categoryId)
+      .then((data) => ({ data }));
+  }
   @Put('channels/:channelId/categories/:categoryId') upsertPublication(
     @Req() req: any,
     @Param('storeId') requested: string,
