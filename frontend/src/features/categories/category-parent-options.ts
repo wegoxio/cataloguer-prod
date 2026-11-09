@@ -23,3 +23,22 @@ export function availableCategoryParents(categories: Category[], editedCategoryI
 
   return categories.filter((category) => !forbidden.has(category.id));
 }
+
+export function categoryPath(category: Category, categories: Category[]): string {
+  const byId = new Map(categories.map((item) => [item.id, item]));
+  const path = [category.name];
+  const visited = new Set<string>([category.id]);
+  let parentId = category.parentCategory?.id;
+  while (parentId && !visited.has(parentId)) {
+    visited.add(parentId);
+    const parent = byId.get(parentId);
+    if (!parent) {
+      const fallback = category.parentCategory?.id === parentId ? category.parentCategory.name : null;
+      if (fallback) path.unshift(fallback);
+      break;
+    }
+    path.unshift(parent.name);
+    parentId = parent.parentCategory?.id;
+  }
+  return path.join(' › ');
+}

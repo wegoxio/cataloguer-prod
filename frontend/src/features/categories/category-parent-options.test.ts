@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availableCategoryParents } from './category-parent-options';
+import { availableCategoryParents, categoryPath } from './category-parent-options';
 import type { Category } from './types/category.types';
 
 const category = (id: string, parentId?: string): Category => ({
@@ -32,5 +32,9 @@ describe('availableCategoryParents', () => {
 
   it('still permits ancestors and siblings when editing a child', () => {
     expect(availableCategoryParents(categories, 'child-a').map(({ id }) => id)).toEqual(['root-a', 'root-b']);
+  });
+
+  it('builds an unambiguous full hierarchy label', () => {
+    expect(categoryPath(categories[2], categories)).toBe('root-a › child-a › grandchild-a');
   });
 });

@@ -48,6 +48,7 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const [groupKey, setGroupKey] = useState('');
   const [groupPurpose, setGroupPurpose] = useState<'NAVIGATION' | 'FILTER'>('NAVIGATION');
   const [selectedGroup, setSelectedGroup] = useState('');
+  const [groupCategorySearch, setGroupCategorySearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string[]>>({});
@@ -132,6 +133,12 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
     (snapshot?.memberships ?? []).filter((item) => item.groupId === selectedGroup).map((item) => item.categoryId),
   ), [snapshot, selectedGroup]);
   const selectedGroupRecord = groups.find((group) => group.id === selectedGroup);
+  const publishedGroupCategories = categories
+    .filter((category) => publications.get(category.id)?.visible)
+    .filter((category) => {
+      const query = groupCategorySearch.trim().toLocaleLowerCase();
+      return !query || `${category.name} ${category.slug}`.toLocaleLowerCase().includes(query);
+    });
   const productsForCategory = (categoryId: string) => products.filter((product) =>
     (product.categories ?? []).some((category) => idOf(category) === categoryId),
   );
@@ -328,6 +335,9 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
 
         <div>
           <h4 className="mb-2 text-sm font-semibold text-slate-700">Contenido de grupos</h4>
+          <p className="mb-3 rounded-md border border-blue-100 bg-blue-50/50 px-3 py-2 text-xs leading-5 text-slate-600">
+            Para que una categoría aparezca en el storefront, primero publícala en el canal activo y después inclúyela en uno de sus grupos de navegación visibles. La categoría padre no controla esta sección.
+          </p>
           <select className="mb-3 block w-full rounded border border-slate-300 bg-white p-2 text-sm" value={selectedGroup} onChange={(event) => setSelectedGroup(event.target.value)}>
             <option value="">Selecciona un grupo</option>
             {groups.map((group) => <option key={group.id} value={group.id}>{group.name} · {group.purpose}</option>)}
@@ -340,8 +350,15 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                 {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
               </select>
             </label>
+            <Input
+              label="Buscar categoría publicada"
+              value={groupCategorySearch}
+              onChange={(event) => setGroupCategorySearch(event.target.value)}
+              placeholder="Ej. Aparadores / Bar"
+            />
             <div className="grid max-h-64 gap-2 overflow-auto rounded border border-slate-200 p-3 md:grid-cols-2 lg:grid-cols-3">
-              {categories.filter((category) => publications.get(category.id)?.visible).map((category) => <label className="flex items-center gap-2 text-xs" key={category.id}><input type="checkbox" checked={memberIds.has(category.id)} disabled={busy} onChange={(event) => { const ids = new Set(memberIds); event.target.checked ? ids.add(category.id) : ids.delete(category.id); mutate(() => apiFetch(`/stores/${storeId}/catalogue-navigation/groups/${selectedGroup}/categories`, { method: 'PUT', token, body: JSON.stringify({ categoryIds: [...ids] }) })); }} />{category.name}</label>)}
+              {publishedGroupCategories.length === 0 && <p className="col-span-full py-3 text-center text-xs text-slate-400">No hay categorías publicadas que coincidan.</p>}
+              {publishedGroupCategories.map((category) => <label className="flex items-center gap-2 text-xs" key={category.id}><input type="checkbox" checked={memberIds.has(category.id)} disabled={busy} onChange={(event) => { const ids = new Set(memberIds); event.target.checked ? ids.add(category.id) : ids.delete(category.id); mutate(() => apiFetch(`/stores/${storeId}/catalogue-navigation/groups/${selectedGroup}/categories`, { method: 'PUT', token, body: JSON.stringify({ categoryIds: [...ids] }) })); }} />{category.name}</label>)}
             </div>
           </div>}
         </div>

@@ -1,18 +1,19 @@
 'use client';
 
 import React from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Input from '../../../components/ui/input';
 import Select from '../../../components/ui/select';
 import Textarea from '../../../components/ui/textarea';
 import Button from '../../../components/ui/button';
+import { SearchableSelect } from '../../../components/ui/searchable-select';
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { apiFetch } from '../../../lib/api-client';
 
 import type { Category } from '../types/category.types';
-import { availableCategoryParents } from '../category-parent-options';
+import { availableCategoryParents, categoryPath } from '../category-parent-options';
 
 const categorySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -94,6 +95,7 @@ export default function CategoryForm({
   }, [previewUrl]);
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<CategorySchemaInput, unknown, CategorySchema>({
@@ -112,6 +114,14 @@ export default function CategoryForm({
   });
 
   const availableParents = availableCategoryParents(categories, initialValues?.id);
+  const parentOptions = [
+    { value: '', label: 'None (Root Category)', searchText: 'root none' },
+    ...availableParents.map((category) => ({
+      value: category.id,
+      label: categoryPath(category, categories),
+      searchText: `${category.name} ${category.slug}`,
+    })),
+  ];
 
   return (
     <form onSubmit={handleSubmit((data) => onSubmit({
@@ -220,14 +230,28 @@ export default function CategoryForm({
         />
       </div>
 
-      <Select label="Parent Category" disabled={categoriesLoading || Boolean(categoriesError)} error={errors.parentCategoryId?.message || categoriesError || undefined} {...register('parentCategoryId')}>
-        <option value="">{categoriesLoading ? 'Loading all categories…' : categoriesError ? 'Categories unavailable' : 'None (Root Category)'}</option>
-        {availableParents.map((parent) => (
-          <option key={parent.id} value={parent.id}>
-            {parent.name}
-          </option>
-        ))}
-      </Select>
+      <div className="space-y-1.5">
+        <Controller
+          name="parentCategoryId"
+          control={control}
+          render={({ field }) => (
+            <SearchableSelect
+              label="Parent Category"
+              value={field.value ?? ''}
+              options={parentOptions}
+              placeholder={categoriesLoading ? 'Loading all categories…' : categoriesError ? 'Categories unavailable' : 'None (Root Category)'}
+              searchPlaceholder="Search category by name, path or slug…"
+              emptyMessage="No matching category"
+              disabled={categoriesLoading || Boolean(categoriesError)}
+              error={errors.parentCategoryId?.message || categoriesError || undefined}
+              onChange={field.onChange}
+            />
+          )}
+        />
+        <p className="text-[11px] leading-4 text-slate-500">
+          This only defines the category hierarchy. Storefront visibility is controlled by the channel and navigation-group configuration.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Select label="Type of grouping" error={errors.kind?.message} {...register('kind')}>
