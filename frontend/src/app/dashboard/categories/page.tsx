@@ -19,7 +19,7 @@ import ConfirmModal from '../../../components/ui/confirm-modal';
 import CategoryTable from '../../../features/categories/components/category-table';
 import CategoryForm, { type CategoryFormSubmission } from '../../../features/categories/components/category-form';
 import { CatalogueNavigationManager } from '../../../features/categories/components/catalogue-navigation-manager';
-import { categoryQueryIdentity, useCategoryList } from '../../../features/categories/category-queries';
+import { categoryQueryIdentity, useCategoryDirectory, useCategoryList } from '../../../features/categories/category-queries';
 import { queryClient, queryKeys } from '../../../lib/query-client';
 
 import type { Category } from '../../../features/categories/types/category.types';
@@ -51,6 +51,12 @@ export default function CategoriesPage() {
     sortDirection,
   }), [debouncedSearch, showArchived, page, sortBy, sortDirection]);
   const categoriesQuery = useCategoryList(accessToken, scope?.organizationId, scope?.storeId, listFilters);
+  const categoryDirectoryQuery = useCategoryDirectory(
+    accessToken,
+    scope?.organizationId,
+    scope?.storeId,
+    isFormOpen,
+  );
   const categories = categoriesQuery.data?.items ?? [];
   const totalPages = categoriesQuery.data?.totalPages ?? 1;
   const loading = categoriesQuery.isPending;
@@ -330,7 +336,9 @@ export default function CategoriesPage() {
         <CategoryForm
           key={editingCategory?.id ?? 'new'}
           initialValues={editingCategory}
-          categories={categories}
+          categories={categoryDirectoryQuery.data ?? []}
+          categoriesLoading={categoryDirectoryQuery.isPending}
+          categoriesError={categoryDirectoryQuery.error instanceof Error ? categoryDirectoryQuery.error.message : null}
           onSubmit={handleCreateOrUpdate}
           token={accessToken ?? undefined}
           storeId={scope?.storeId ?? undefined}

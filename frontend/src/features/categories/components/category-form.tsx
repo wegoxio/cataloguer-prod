@@ -12,6 +12,7 @@ import { ImagePlus, Trash2 } from 'lucide-react';
 import { apiFetch } from '../../../lib/api-client';
 
 import type { Category } from '../types/category.types';
+import { availableCategoryParents } from '../category-parent-options';
 
 const categorySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -39,6 +40,8 @@ export type CategoryFormSubmission = CategorySchema & {
 interface CategoryFormProps {
   initialValues?: Category | null;
   categories: Category[];
+  categoriesLoading?: boolean;
+  categoriesError?: string | null;
   onSubmit: (data: CategoryFormSubmission) => Promise<void>;
   onCancel: () => void;
   token?: string;
@@ -48,6 +51,8 @@ interface CategoryFormProps {
 export default function CategoryForm({
   initialValues,
   categories,
+  categoriesLoading = false,
+  categoriesError = null,
   onSubmit,
   onCancel,
   token,
@@ -106,8 +111,7 @@ export default function CategoryForm({
     },
   });
 
-  // Filter out the category itself to prevent parenting loop (self-parent check)
-  const availableParents = categories.filter((c) => !initialValues || c.id !== initialValues.id);
+  const availableParents = availableCategoryParents(categories, initialValues?.id);
 
   return (
     <form onSubmit={handleSubmit((data) => onSubmit({
@@ -216,8 +220,8 @@ export default function CategoryForm({
         />
       </div>
 
-      <Select label="Parent Category" error={errors.parentCategoryId?.message} {...register('parentCategoryId')}>
-        <option value="">None (Root Category)</option>
+      <Select label="Parent Category" disabled={categoriesLoading || Boolean(categoriesError)} error={errors.parentCategoryId?.message || categoriesError || undefined} {...register('parentCategoryId')}>
+        <option value="">{categoriesLoading ? 'Loading all categories…' : categoriesError ? 'Categories unavailable' : 'None (Root Category)'}</option>
         {availableParents.map((parent) => (
           <option key={parent.id} value={parent.id}>
             {parent.name}
@@ -260,7 +264,7 @@ export default function CategoryForm({
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" isLoading={isSubmitting}>
+        <Button type="submit" disabled={categoriesLoading || Boolean(categoriesError)} isLoading={isSubmitting}>
           Save Category
         </Button>
       </div>
