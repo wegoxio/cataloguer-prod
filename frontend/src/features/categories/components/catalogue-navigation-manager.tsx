@@ -31,7 +31,7 @@ type Publication = {
 };
 type Membership = { groupId: string; categoryId: string };
 type Snapshot = { channels: Channel[]; groups: Group[]; publications: Publication[]; memberships: Membership[] };
-type Category = { id: string; name: string; slug: string; imageUrl?: string | null };
+type Category = { id: string; name: string; slug: string; publicLabel?: string | null; imageUrl?: string | null };
 type Product = { id: string; name: string; categories?: Ref[] };
 
 const idOf = (value: Ref) => typeof value === 'string' ? value : value.id;
@@ -54,6 +54,8 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   const [orderDrafts, setOrderDrafts] = useState<Record<string, string[]>>({});
   const [visibilityDrafts, setVisibilityDrafts] = useState<Record<string, string[]>>({});
   const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null);
+  const [draggingAvailableCategoryId, setDraggingAvailableCategoryId] = useState<string | null>(null);
+  const [availableCategorySearch, setAvailableCategorySearch] = useState('');
   const lastDragTargetId = useRef<string | null>(null);
 
   const load = useCallback(async () => {
@@ -124,6 +126,18 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
     ];
   }, [draftOrderIds, navigationGroups]);
   const orderedGroupIds = orderedNavigationGroups.map((group) => group.id);
+  const navigationCategoryIds = useMemo(() => new Set(
+    (snapshot?.memberships ?? [])
+      .filter((membership) => navigationGroups.some((group) => group.id === membership.groupId))
+      .map((membership) => membership.categoryId),
+  ), [navigationGroups, snapshot?.memberships]);
+  const availableNavigationCategories = useMemo(() => {
+    const query = availableCategorySearch.trim().toLocaleLowerCase();
+    return categories.filter((category) =>
+      !navigationCategoryIds.has(category.id)
+      && (!query || `${category.name} ${category.slug}`.toLocaleLowerCase().includes(query)),
+    );
+  }, [availableCategorySearch, categories, navigationCategoryIds]);
   const orderChanged = orderedGroupIds.length === persistedOrderIds.length
     && orderedGroupIds.some((id, index) => id !== persistedOrderIds[index]);
   const visibilityChanged = draftVisibleIds.length !== persistedVisibleIds.length
@@ -180,6 +194,16 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
     else visible.add(groupId);
     setVisibilityDrafts((current) => ({ ...current, [channelId]: [...visible] }));
   };
+  const groupCategoryNames = (groupId: string) => (snapshot?.memberships ?? [])
+    .filter((membership) => membership.groupId === groupId)
+    .map((membership) => categories.find((category) => category.id === membership.categoryId)?.name)
+    .filter((name): name is string => Boolean(name));
+  const addCategoryToNavigation = (category: Category) => mutate(async () => {
+    await apiFetch(
+      `/stores/${storeId}/catalogue-navigation/channels/${channelId}/navigation/categories/${category.id}`,
+      { method: 'POST', token },
+    );
+  });
   const saveDraftOrder = () => {
     const groupIds = orderedNavigationGroups.map((group) => group.id);
     void mutate(async () => {
@@ -239,7 +263,16 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
             </div>
           </div>
           {navigationConfigurationChanged && <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Tienes cambios de navegación sin guardar.</p>}
-          <div className="mt-3 space-y-2">
+          <div
+            className={`mt-3 space-y-2 rounded-lg transition-colors ${draggingAvailableCategoryId ? 'bg-blue-50 p-2 ring-2 ring-blue-200' : ''}`}
+            onDragOver={(event) => { if (draggingAvailableCategoryId) event.preventDefault(); }}
+            onDrop={(event) => {
+              event.preventDefault();
+              const category = categories.find((item) => item.id === draggingAvailableCategoryId);
+              setDraggingAvailableCategoryId(null);
+              if (category) void addCategoryToNavigation(category);
+            }}
+          >
             {navigationGroups.length === 0 ? (
               <p className="rounded border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500">
                 Este canal aun no tiene grupos de navegacion activos.
@@ -262,6 +295,7 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-700">{group.name}</p>
                   <p className="truncate text-[11px] text-slate-400">{group.key}</p>
+                  {groupCategoryNames(group.id).length > 0 && <p className="mt-1 truncate text-[11px] text-blue-600">{groupCategoryNames(group.id).join(' · ')}</p>}
                 </div>
                 <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600" onPointerDown={(event) => event.stopPropagation()}>
                   <input type="checkbox" checked={draftVisibleIds.includes(group.id)} disabled={busy} onChange={() => toggleGroupVisibility(group.id)} />
@@ -277,6 +311,41 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                 </div>
               </div>
             ))}
+          </div>
+          <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h5 className="text-sm font-semibold text-slate-800">Categorías disponibles</h5>
+                <p className="mt-1 text-xs text-slate-500">Arrástralas al orden superior o usa Añadir. Si aún no están publicadas, el sistema las publica en este canal automáticamente.</p>
+              </div>
+              <div className="w-full sm:w-72">
+                <Input label="Buscar categoría" value={availableCategorySearch} onChange={(event) => setAvailableCategorySearch(event.target.value)} placeholder="Ej. Aparadores" />
+              </div>
+            </div>
+            <div className="mt-3 grid max-h-72 gap-2 overflow-y-auto md:grid-cols-2 xl:grid-cols-3">
+              {availableNavigationCategories.length === 0 && <p className="col-span-full rounded border border-dashed border-slate-200 py-6 text-center text-xs text-slate-400">No quedan categorías disponibles para añadir.</p>}
+              {availableNavigationCategories.map((category) => {
+                const published = Boolean(publications.get(category.id)?.visible);
+                return (
+                  <div
+                    key={category.id}
+                    draggable={!busy}
+                    onDragStart={(event) => { setDraggingAvailableCategoryId(category.id); event.dataTransfer.effectAllowed = 'move'; }}
+                    onDragEnd={() => setDraggingAvailableCategoryId(null)}
+                    className="flex cursor-grab items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 active:cursor-grabbing"
+                  >
+                    <GripVertical className="h-4 w-4 shrink-0 text-slate-300" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold text-slate-700">{category.publicLabel || category.name}</p>
+                      <p className="truncate text-[10px] text-slate-400">{category.slug} · {published ? 'Publicada' : 'Sin publicar'}</p>
+                    </div>
+                    <Button type="button" size="sm" disabled={busy} onClick={() => void addCategoryToNavigation(category)}>
+                      {published ? 'Añadir' : 'Publicar y añadir'}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
