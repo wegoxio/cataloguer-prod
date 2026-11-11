@@ -965,11 +965,21 @@ export class PublicCatalogueService {
         andClauses.push({ categories: { id: { $in: groupCategoryIds } } });
       }
 
-      if (minPrice !== undefined) {
-        andClauses.push({ price: { $gte: minPrice } });
-      }
-      if (maxPrice !== undefined) {
-        andClauses.push({ price: { $lte: maxPrice } });
+      if (minPrice !== undefined || maxPrice !== undefined) {
+        // A family card is deliberately not sellable and therefore normally
+        // carries no commercial price of its own. Price filters must answer
+        // from one visible purchasable member; applying them to the card made
+        // every correctly modelled family (card price = 0) disappear from the
+        // storefront even when its children had valid prices.
+        const price: Record<string, number> = {};
+        if (minPrice !== undefined) price.$gte = minPrice;
+        if (maxPrice !== undefined) price.$lte = maxPrice;
+        andClauses.push({
+          $or: [
+            { children: { $none: {} }, price },
+            { children: { $some: { ...this.visibleChildWhere(options), price } } },
+          ],
+        });
       }
       if (hasSalePrice !== undefined) {
         const visibleChild = this.visibleChildWhere(options);
@@ -1054,6 +1064,23 @@ export class PublicCatalogueService {
           })
         : null;
 
+    // Family cards have no price. Price ordering therefore uses the cheapest
+    // visible child, while standalone products continue to use their own
+    // value. This keeps filtering and ordering on the same commercial member
+    // instead of pinning every family to zero.
+    const priceRank =
+      sortBy === 'price'
+        ? raw(
+            (alias) => `case
+              when exists (select 1 from products c where c.parent_id = ${alias}.id and c.removed_at is null)
+                then (select min(c.price) from products c
+                       where c.parent_id = ${alias}.id and c.removed_at is null
+                         and c.archived_at is null and c.status = 'PUBLISHED')
+              else ${alias}.price
+            end`,
+          )
+        : null;
+
     const [products, total] = await this.productRepository.findAndCount(where, {
       populate: ['categories', 'images', 'branchLinks', 'children', 'children.images', 'children.branchLinks'],
       limit,
@@ -1062,7 +1089,9 @@ export class PublicCatalogueService {
       // prices or names must never duplicate or drop a product between pages.
       orderBy: catalogueRank
         ? ({ [catalogueRank]: 'asc', name: 'asc', id: 'asc' } as never)
-        : ({ [sortBy]: sortDirection, id: sortDirection } as never),
+        : priceRank
+          ? ({ [priceRank]: sortDirection, id: sortDirection } as never)
+          : ({ [sortBy]: sortDirection, id: sortDirection } as never),
     });
 
     const fieldsByProduct = await this.publicFieldsByProduct(
