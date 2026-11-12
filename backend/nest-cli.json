@@ -12,6 +12,10 @@
       {
         "include": "jobs/h1-*.json",
         "outDir": "dist"
+      },
+      {
+        "include": "jobs/data/**/*.json",
+        "outDir": "dist"
       }
     ],
     "watchAssets": true
