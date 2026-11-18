@@ -93,3 +93,47 @@ jobs:
               echo "::endgroup::"
             done
           done
+
+      - name: Publish reconciliation diagnostics
+        if: always()
+        shell: bash
+        run: |
+          python3 - "$REPORT_ROOT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          reports = sorted(root.rglob("*.json"))
+          if not reports:
+              print("::error title=DesignHof reconciliation::No JSON report was generated")
+              raise SystemExit(0)
+
+          for report in reports:
+              try:
+                  data = json.loads(report.read_text(encoding="utf-8"))
+              except Exception as error:
+                  message = f"Cannot read {report}: {error}"
+                  print(f"::error title=Unreadable reconciliation report::{message}")
+                  continue
+
+              diagnostic = {
+                  key: data.get(key)
+                  for key in (
+                      "status",
+                      "mode",
+                      "summary",
+                      "errors",
+                      "warnings",
+                      "missingProducts",
+                      "unmatched",
+                      "conflicts",
+                  )
+                  if data.get(key) not in (None, [], {})
+              }
+              message = json.dumps(diagnostic, ensure_ascii=False, separators=(",", ":"))
+              message = message[:6000].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              level = "error" if str(data.get("status", "")).upper() == "FAILED" else "notice"
+              title = f"{report.parent.name}/{report.name}".replace("%", "%25").replace("\r", "").replace("\n", " ")
+              print(f"::{level} title={title}::{message}")
+          PY
