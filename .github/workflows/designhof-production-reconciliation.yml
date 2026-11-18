@@ -1,0 +1,92 @@
+name: DesignHof production reconciliation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/designhof-production-reconciliation.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: designhof-production-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Reconcile products and prices
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-designhof-reconciliation]')
+    runs-on: [self-hosted, Linux, X64, cataloguer-prod]
+    timeout-minutes: 45
+    steps:
+      - name: Prepare report directories
+        run: |
+          sudo install -d -m 0777 \
+            /opt/cataloguer/import-reports/missing-master \
+            /opt/cataloguer/import-reports/h1-price-changes \
+            /opt/cataloguer/import-reports/h1-price-baseline
+
+      - name: Import missing master products
+        working-directory: /opt/cataloguer
+        run: |
+          set -euo pipefail
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
+            -v /opt/cataloguer/import-reports/missing-master:/tmp/cataloguer-missing-master-reports \
+            import-runner node dist/jobs/import-missing-master-products.main.js plan \
+            --report-dir /tmp/cataloguer-missing-master-reports
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
+            -v /opt/cataloguer/import-reports/missing-master:/tmp/cataloguer-missing-master-reports \
+            import-runner node dist/jobs/import-missing-master-products.main.js execute \
+            --confirm IMPORT_MISSING_MASTER_PRODUCTS \
+            --report-dir /tmp/cataloguer-missing-master-reports
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
+            -v /opt/cataloguer/import-reports/missing-master:/tmp/cataloguer-missing-master-reports \
+            import-runner node dist/jobs/import-missing-master-products.main.js plan \
+            --report-dir /tmp/cataloguer-missing-master-reports
+
+      - name: Apply authoritative H1 price changes
+        working-directory: /opt/cataloguer
+        run: |
+          set -euo pipefail
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
+            -v /opt/cataloguer/import-reports/h1-price-changes:/tmp/cataloguer-h1-price-reports \
+            import-runner node dist/jobs/update-h1-prices.main.js plan \
+            --manifest /app/dist/jobs/data/h1-price-changes-2026-11-18.json \
+            --allow-missing-products --sync-store-overrides \
+            --report-dir /tmp/cataloguer-h1-price-reports
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
+            -v /opt/cataloguer/import-reports/h1-price-changes:/tmp/cataloguer-h1-price-reports \
+            import-runner node dist/jobs/update-h1-prices.main.js execute \
+            --manifest /app/dist/jobs/data/h1-price-changes-2026-11-18.json \
+            --allow-missing-products --sync-store-overrides \
+            --confirm UPDATE_H1_PRICES \
+            --report-dir /tmp/cataloguer-h1-price-reports
+
+      - name: Validate reference price workbook
+        working-directory: /opt/cataloguer
+        run: |
+          set -euo pipefail
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
+            -v /opt/cataloguer/import-reports/h1-price-baseline:/tmp/cataloguer-h1-price-reports \
+            import-runner node dist/jobs/update-h1-prices.main.js plan \
+            --manifest /app/dist/jobs/data/h1-price-baseline-2026-11-18.json \
+            --allow-missing-products \
+            --report-dir /tmp/cataloguer-h1-price-reports
+
+      - name: Expose reconciliation reports in logs
+        if: always()
+        run: |
+          for directory in \
+            /opt/cataloguer/import-reports/missing-master \
+            /opt/cataloguer/import-reports/h1-price-changes \
+            /opt/cataloguer/import-reports/h1-price-baseline; do
+            for report in "$directory"/*.json; do
+              [ -f "$report" ] || continue
+              echo "::group::$report"
+              sudo cat "$report"
+              echo
+              echo "::endgroup::"
+            done
+          done
