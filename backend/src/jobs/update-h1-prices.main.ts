@@ -23,6 +23,11 @@ type ProductMatch = {
 const CONFIRMATION = 'UPDATE_H1_PRICES';
 const asText = (value: unknown) => String(value ?? '').trim();
 
+function placeholders(values: readonly unknown[]): string {
+  if (values.length === 0) throw new Error('Cannot build an empty SQL IN clause');
+  return values.map(() => '?').join(',');
+}
+
 function parseArgs(argv: string[]) {
   const mode = (argv[0] ?? 'plan') as Mode;
   if (!['plan', 'execute'].includes(mode)) throw new Error(`Modo desconocido: ${mode}`);
@@ -150,9 +155,9 @@ async function main() {
        from products
        where organization_id = ?::uuid
          and removed_at is null
-         and upper(trim(manufacturer_code)) = any(?::text[])
+         and upper(trim(manufacturer_code)) in (${placeholders(codes)})
        order by upper(trim(manufacturer_code)), id`,
-      [organization.id, codes],
+      [organization.id, ...codes],
     );
     const byCode = new Map<string, ProductMatch[]>();
     for (const match of matches) {
@@ -192,9 +197,9 @@ async function main() {
           `select sp.product_id, sp.store_id, s.name as store_name, sp.price
            from store_products sp
            join stores s on s.id = sp.store_id
-           where sp.organization_id = ?::uuid and sp.product_id = any(?::uuid[]) and sp.price is not null
+           where sp.organization_id = ?::uuid and sp.product_id in (${placeholders(affectedProductIds)}) and sp.price is not null
            order by sp.product_id, s.name`,
-          [organization.id, affectedProductIds],
+          [organization.id, ...affectedProductIds],
         )
       : [];
 
@@ -289,10 +294,10 @@ async function main() {
         const verifiedProducts = await sql.execute<Array<{ id: string; manufacturer_code: string; price: string }>>(
           `select id, manufacturer_code, price::text as price
            from products
-           where organization_id = ?::uuid and id = any(?::uuid[])
+           where organization_id = ?::uuid and id in (${placeholders(productIds)})
              and removed_at is null and archived_at is null
            for update`,
-          [organization.id, productIds],
+          [organization.id, ...productIds],
         );
         const expectedById = new Map(resolved.map((row) => [row.productId, row]));
         const verificationErrors: string[] = [];
@@ -349,9 +354,9 @@ async function main() {
                 `select sp.product_id, s.name as store_name, sp.price::text as price
                  from store_products sp
                  join stores s on s.id = sp.store_id
-                 where sp.organization_id = ?::uuid and sp.product_id = any(?::uuid[]) and sp.price is not null
+                 where sp.organization_id = ?::uuid and sp.product_id in (${placeholders(affectedProductIds)}) and sp.price is not null
                  order by sp.product_id, s.name`,
-                [organization.id, affectedProductIds],
+                [organization.id, ...affectedProductIds],
               )
             : [];
           for (const override of verifiedOverrides) {

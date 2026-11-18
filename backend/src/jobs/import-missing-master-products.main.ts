@@ -79,6 +79,11 @@ function normalize(value: string): string {
   return slugify(value).replace(/-/g, '');
 }
 
+function placeholders(values: readonly unknown[]): string {
+  if (values.length === 0) throw new Error('Cannot build an empty SQL IN clause');
+  return values.map(() => '?').join(',');
+}
+
 async function rows<T>(em: EntityManager, sql: string, params: unknown[] = []): Promise<T[]> {
   return em.getConnection().execute(sql, params) as Promise<T[]>;
 }
@@ -145,16 +150,18 @@ async function main() {
       );
     const store = stores[0];
 
+    const externalIds = products.map((product) => product.externalId);
+    const catalogCodes = products.map((product) => product.catalogCode);
     const identities = await rows<{ external_id: string; target_id: string }>(
       em,
-      `select external_id, target_id from import_external_identities where organization_id=? and source_system=? and target_type='product' and external_id = any(?::text[])`,
-      [organization.id, products[0].sourceSystem, products.map((p) => p.externalId)],
+      `select external_id, target_id from import_external_identities where organization_id=? and source_system=? and target_type='product' and external_id in (${placeholders(externalIds)})`,
+      [organization.id, products[0].sourceSystem, ...externalIds],
     );
     const identityMap = new Map(identities.map((entry) => [entry.external_id, entry.target_id]));
     const skuRows = await rows<{ id: string; sku: string }>(
       em,
-      `select id, sku from products where organization_id=? and removed_at is null and sku = any(?::text[])`,
-      [organization.id, products.map((p) => p.catalogCode)],
+      `select id, sku from products where organization_id=? and removed_at is null and sku in (${placeholders(catalogCodes)})`,
+      [organization.id, ...catalogCodes],
     );
     const skuMap = new Map(skuRows.map((entry) => [entry.sku, entry.id]));
 
@@ -274,8 +281,8 @@ async function main() {
           inserted.push({ externalId: product.externalId, sku: product.catalogCode, productId });
         }
         const verified = (await sql.execute(
-          `select count(*)::int as count from import_external_identities where organization_id=? and source_system=? and target_type='product' and external_id = any(?::text[])`,
-          [organization.id, products[0].sourceSystem, products.map((p) => p.externalId)],
+          `select count(*)::int as count from import_external_identities where organization_id=? and source_system=? and target_type='product' and external_id in (${placeholders(externalIds)})`,
+          [organization.id, products[0].sourceSystem, ...externalIds],
         )) as Array<{ count: number }>;
         if (verified[0]?.count !== products.length)
           throw new Error(`Identity verification returned ${verified[0]?.count}/${products.length}`);
