@@ -21,62 +21,100 @@ jobs:
     runs-on: [self-hosted, Linux, X64, cataloguer-prod]
     timeout-minutes: 45
     steps:
+      - name: Wait for the backend release containing this reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_image="cataloguer-backend:${GITHUB_SHA}"
+          for attempt in $(seq 1 120); do
+            container="$(docker ps \
+              --filter label=com.docker.compose.service=backend \
+              --format '{{.ID}}' | head -n 1)"
+            if [ -n "$container" ]; then
+              image="$(docker inspect --format '{{.Config.Image}}' "$container")"
+              health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container")"
+              if [ "$image" = "$expected_image" ] && [ "$health" = "healthy" ]; then
+                echo "BACKEND_CONTAINER=$container" >> "$GITHUB_ENV"
+                echo "Using healthy backend container $container ($image)"
+                exit 0
+              fi
+              echo "Attempt $attempt/120: backend image=$image health=$health; waiting for $expected_image"
+            else
+              echo "Attempt $attempt/120: no backend container found"
+            fi
+            sleep 5
+          done
+          echo "::error::The backend release $expected_image was not healthy after 10 minutes"
+          exit 1
+
       - name: Prepare report directories
         run: |
+          set -euo pipefail
           REPORT_ROOT="$RUNNER_TEMP/designhof-production-reconciliation"
           echo "REPORT_ROOT=$REPORT_ROOT" >> "$GITHUB_ENV"
+          rm -rf "$REPORT_ROOT"
           mkdir -p \
             "$REPORT_ROOT/missing-master" \
             "$REPORT_ROOT/h1-price-changes" \
             "$REPORT_ROOT/h1-price-baseline"
-          chmod -R 0777 "$REPORT_ROOT"
+          docker exec "$BACKEND_CONTAINER" rm -rf /tmp/designhof-production-reconciliation
+          docker exec "$BACKEND_CONTAINER" mkdir -p \
+            /tmp/designhof-production-reconciliation/missing-master \
+            /tmp/designhof-production-reconciliation/h1-price-changes \
+            /tmp/designhof-production-reconciliation/h1-price-baseline
 
       - name: Import missing master products
-        working-directory: /opt/cataloguer
         run: |
           set -euo pipefail
-          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
-            -v "$REPORT_ROOT/missing-master:/tmp/cataloguer-missing-master-reports" \
-            import-runner node dist/jobs/import-missing-master-products.main.js plan \
-            --report-dir /tmp/cataloguer-missing-master-reports
-          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
-            -v "$REPORT_ROOT/missing-master:/tmp/cataloguer-missing-master-reports" \
-            import-runner node dist/jobs/import-missing-master-products.main.js execute \
+          report_dir=/tmp/designhof-production-reconciliation/missing-master
+          docker exec "$BACKEND_CONTAINER" node dist/jobs/import-missing-master-products.main.js plan \
+            --report-dir "$report_dir"
+          docker exec "$BACKEND_CONTAINER" node dist/jobs/import-missing-master-products.main.js execute \
             --confirm IMPORT_MISSING_MASTER_PRODUCTS \
-            --report-dir /tmp/cataloguer-missing-master-reports
-          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
-            -v "$REPORT_ROOT/missing-master:/tmp/cataloguer-missing-master-reports" \
-            import-runner node dist/jobs/import-missing-master-products.main.js plan \
-            --report-dir /tmp/cataloguer-missing-master-reports
+            --report-dir "$report_dir"
+          docker exec "$BACKEND_CONTAINER" node dist/jobs/import-missing-master-products.main.js plan \
+            --report-dir "$report_dir"
+          docker cp "$BACKEND_CONTAINER:$report_dir/." "$REPORT_ROOT/missing-master/"
 
       - name: Apply authoritative H1 price changes
-        working-directory: /opt/cataloguer
         run: |
           set -euo pipefail
-          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
-            -v "$REPORT_ROOT/h1-price-changes:/tmp/cataloguer-h1-price-reports" \
-            import-runner node dist/jobs/update-h1-prices.main.js plan \
+          report_dir=/tmp/designhof-production-reconciliation/h1-price-changes
+          docker exec "$BACKEND_CONTAINER" node dist/jobs/update-h1-prices.main.js plan \
             --manifest /app/dist/jobs/data/h1-price-changes-2026-11-18.json \
             --allow-missing-products --sync-store-overrides \
-            --report-dir /tmp/cataloguer-h1-price-reports
-          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
-            -v "$REPORT_ROOT/h1-price-changes:/tmp/cataloguer-h1-price-reports" \
-            import-runner node dist/jobs/update-h1-prices.main.js execute \
+            --report-dir "$report_dir"
+          docker exec "$BACKEND_CONTAINER" node dist/jobs/update-h1-prices.main.js execute \
             --manifest /app/dist/jobs/data/h1-price-changes-2026-11-18.json \
             --allow-missing-products --sync-store-overrides \
             --confirm UPDATE_H1_PRICES \
-            --report-dir /tmp/cataloguer-h1-price-reports
+            --report-dir "$report_dir"
+          docker cp "$BACKEND_CONTAINER:$report_dir/." "$REPORT_ROOT/h1-price-changes/"
 
       - name: Validate reference price workbook
-        working-directory: /opt/cataloguer
         run: |
           set -euo pipefail
-          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
-            -v "$REPORT_ROOT/h1-price-baseline:/tmp/cataloguer-h1-price-reports" \
-            import-runner node dist/jobs/update-h1-prices.main.js plan \
+          report_dir=/tmp/designhof-production-reconciliation/h1-price-baseline
+          docker exec "$BACKEND_CONTAINER" node dist/jobs/update-h1-prices.main.js plan \
             --manifest /app/dist/jobs/data/h1-price-baseline-2026-11-18.json \
             --allow-missing-products \
-            --report-dir /tmp/cataloguer-h1-price-reports
+            --report-dir "$report_dir"
+          docker cp "$BACKEND_CONTAINER:$report_dir/." "$REPORT_ROOT/h1-price-baseline/"
+
+      - name: Collect reconciliation reports
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          REPORT_ROOT="${REPORT_ROOT:-$RUNNER_TEMP/designhof-production-reconciliation}"
+          mkdir -p "$REPORT_ROOT/missing-master" "$REPORT_ROOT/h1-price-changes" "$REPORT_ROOT/h1-price-baseline"
+          if [ -n "${BACKEND_CONTAINER:-}" ]; then
+            for report in missing-master h1-price-changes h1-price-baseline; do
+              docker cp \
+                "$BACKEND_CONTAINER:/tmp/designhof-production-reconciliation/$report/." \
+                "$REPORT_ROOT/$report/" 2>/dev/null || true
+            done
+          fi
 
       - name: Expose reconciliation reports in logs
         if: always()
