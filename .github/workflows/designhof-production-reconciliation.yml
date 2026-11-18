@@ -20,11 +20,11 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[run-designhof-reconciliation]')
     runs-on: [self-hosted, Linux, X64, cataloguer-prod]
     timeout-minutes: 45
-    env:
-      REPORT_ROOT: ${{ runner.temp }}/designhof-production-reconciliation
     steps:
       - name: Prepare report directories
         run: |
+          REPORT_ROOT="$RUNNER_TEMP/designhof-production-reconciliation"
+          echo "REPORT_ROOT=$REPORT_ROOT" >> "$GITHUB_ENV"
           mkdir -p \
             "$REPORT_ROOT/missing-master" \
             "$REPORT_ROOT/h1-price-changes" \
