@@ -1,0 +1,59 @@
+[
+  {
+    "code": "H11000376",
+    "prices": [
+      575,
+      496
+    ],
+    "occurrences": [
+      {
+        "price": 575,
+        "row": 52,
+        "list": "H1 PRECIOS NUEVOS"
+      },
+      {
+        "price": 496,
+        "row": 87,
+        "list": "H1 NEW IN"
+      }
+    ]
+  },
+  {
+    "code": "H11000378",
+    "prices": [
+      658,
+      567
+    ],
+    "occurrences": [
+      {
+        "price": 658,
+        "row": 54,
+        "list": "H1 PRECIOS NUEVOS"
+      },
+      {
+        "price": 567,
+        "row": 86,
+        "list": "H1 NEW IN"
+      }
+    ]
+  },
+  {
+    "code": "H11200147",
+    "prices": [
+      882,
+      1023
+    ],
+    "occurrences": [
+      {
+        "price": 882,
+        "row": 83,
+        "list": "H1 NEW IN"
+      },
+      {
+        "price": 1023,
+        "row": 97,
+        "list": "H1 PRECIOS NUEVOS"
+      }
+    ]
+  }
+]

@@ -33,6 +33,8 @@
     "import:h1:prod": "node dist/jobs/import-h1.main.js",
     "update:h1-prices": "ts-node -r tsconfig-paths/register src/jobs/update-h1-prices.main.ts",
     "update:h1-prices:prod": "node dist/jobs/update-h1-prices.main.js",
+    "import:missing-master": "ts-node -r tsconfig-paths/register src/jobs/import-missing-master-products.main.ts",
+    "import:missing-master:prod": "node dist/jobs/import-missing-master-products.main.js",
     "reclassify:designhof-tables": "ts-node -r tsconfig-paths/register src/jobs/reclassify-designhof-tables.main.ts",
     "reclassify:designhof-tables:prod": "node dist/jobs/reclassify-designhof-tables.main.js"
   },
