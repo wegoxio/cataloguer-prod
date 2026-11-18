@@ -150,7 +150,7 @@ async function main() {
        from products
        where organization_id = ?::uuid
          and removed_at is null
-         and upper(trim(manufacturer_code)) in (?)
+         and upper(trim(manufacturer_code)) = any(?::text[])
        order by upper(trim(manufacturer_code)), id`,
       [organization.id, codes],
     );
@@ -192,7 +192,7 @@ async function main() {
           `select sp.product_id, sp.store_id, s.name as store_name, sp.price
            from store_products sp
            join stores s on s.id = sp.store_id
-           where sp.organization_id = ?::uuid and sp.product_id in (?) and sp.price is not null
+           where sp.organization_id = ?::uuid and sp.product_id = any(?::uuid[]) and sp.price is not null
            order by sp.product_id, s.name`,
           [organization.id, affectedProductIds],
         )
@@ -289,7 +289,7 @@ async function main() {
         const verifiedProducts = await sql.execute<Array<{ id: string; manufacturer_code: string; price: string }>>(
           `select id, manufacturer_code, price::text as price
            from products
-           where organization_id = ?::uuid and id in (?)
+           where organization_id = ?::uuid and id = any(?::uuid[])
              and removed_at is null and archived_at is null
            for update`,
           [organization.id, productIds],
@@ -349,7 +349,7 @@ async function main() {
                 `select sp.product_id, s.name as store_name, sp.price::text as price
                  from store_products sp
                  join stores s on s.id = sp.store_id
-                 where sp.organization_id = ?::uuid and sp.product_id in (?) and sp.price is not null
+                 where sp.organization_id = ?::uuid and sp.product_id = any(?::uuid[]) and sp.price is not null
                  order by sp.product_id, s.name`,
                 [organization.id, affectedProductIds],
               )
