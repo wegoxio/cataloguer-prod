@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import * as path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { AppModule } from '../app.module';
