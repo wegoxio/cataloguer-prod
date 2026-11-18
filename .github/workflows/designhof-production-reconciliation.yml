@@ -35,16 +35,16 @@ jobs:
         working-directory: /opt/cataloguer
         run: |
           set -euo pipefail
-          docker compose --env-file .env.infrastructure --profile tools run --rm \
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
             -v "$REPORT_ROOT/missing-master:/tmp/cataloguer-missing-master-reports" \
             import-runner node dist/jobs/import-missing-master-products.main.js plan \
             --report-dir /tmp/cataloguer-missing-master-reports
-          docker compose --env-file .env.infrastructure --profile tools run --rm \
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
             -v "$REPORT_ROOT/missing-master:/tmp/cataloguer-missing-master-reports" \
             import-runner node dist/jobs/import-missing-master-products.main.js execute \
             --confirm IMPORT_MISSING_MASTER_PRODUCTS \
             --report-dir /tmp/cataloguer-missing-master-reports
-          docker compose --env-file .env.infrastructure --profile tools run --rm \
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
             -v "$REPORT_ROOT/missing-master:/tmp/cataloguer-missing-master-reports" \
             import-runner node dist/jobs/import-missing-master-products.main.js plan \
             --report-dir /tmp/cataloguer-missing-master-reports
@@ -53,13 +53,13 @@ jobs:
         working-directory: /opt/cataloguer
         run: |
           set -euo pipefail
-          docker compose --env-file .env.infrastructure --profile tools run --rm \
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
             -v "$REPORT_ROOT/h1-price-changes:/tmp/cataloguer-h1-price-reports" \
             import-runner node dist/jobs/update-h1-prices.main.js plan \
             --manifest /app/dist/jobs/data/h1-price-changes-2026-11-18.json \
             --allow-missing-products --sync-store-overrides \
             --report-dir /tmp/cataloguer-h1-price-reports
-          docker compose --env-file .env.infrastructure --profile tools run --rm \
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
             -v "$REPORT_ROOT/h1-price-changes:/tmp/cataloguer-h1-price-reports" \
             import-runner node dist/jobs/update-h1-prices.main.js execute \
             --manifest /app/dist/jobs/data/h1-price-changes-2026-11-18.json \
@@ -71,7 +71,7 @@ jobs:
         working-directory: /opt/cataloguer
         run: |
           set -euo pipefail
-          docker compose --env-file .env.infrastructure --profile tools run --rm \
+          sudo docker compose --env-file .env.infrastructure --profile tools run --rm \
             -v "$REPORT_ROOT/h1-price-baseline:/tmp/cataloguer-h1-price-reports" \
             import-runner node dist/jobs/update-h1-prices.main.js plan \
             --manifest /app/dist/jobs/data/h1-price-baseline-2026-11-18.json \
