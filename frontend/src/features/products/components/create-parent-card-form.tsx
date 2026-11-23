@@ -51,8 +51,6 @@ export default function CreateParentCardForm({
   const t = useT();
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
-  const [metaTitle, setMetaTitle] = React.useState('');
-  const [metaDescription, setMetaDescription] = React.useState('');
   const [chosen, setChosen] = React.useState<Product[]>([]);
   const [labels, setLabels] = React.useState<Record<string, string>>({});
   const [touched, setTouched] = React.useState<Record<string, boolean>>({});
@@ -108,8 +106,8 @@ export default function CreateParentCardForm({
       await onCreate({
         name: name.trim(),
         description: description.trim() || undefined,
-        metaTitle: metaTitle.trim() || undefined,
-        metaDescription: metaDescription.trim() || undefined,
+        metaTitle: undefined,
+        metaDescription: undefined,
         members,
       });
     } catch (err: any) {
@@ -134,23 +132,6 @@ export default function CreateParentCardForm({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          label="SEO Title (max 160)"
-          maxLength={160}
-          data-testid="card-meta-title"
-          value={metaTitle}
-          onChange={(e) => setMetaTitle(e.target.value)}
-        />
-        <Input
-          label="SEO Description (max 300)"
-          maxLength={300}
-          data-testid="card-meta-description"
-          value={metaDescription}
-          onChange={(e) => setMetaDescription(e.target.value)}
-        />
-      </div>
-
       <div className="space-y-2 p-3 bg-slate-50 rounded-md border border-slate-100">
         <p className="text-[10px] font-semibold text-slate-500 uppercase">{t('Its child products')}</p>
         <p className="text-[11px] text-slate-500">
@@ -163,22 +144,55 @@ export default function CreateParentCardForm({
           placeholder="e.g. Camiseta"
         />
         {searching && <p className="text-[11px] text-slate-400">{t('Searching…')}</p>}
-        <div className="max-h-40 overflow-y-auto space-y-1">
-          {candidates.map((item) => (
-            <label
-              key={item.id}
-              className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer select-none"
-            >
-              <input
-                type="checkbox"
-                data-testid={`card-candidate-${item.id}`}
-                checked={chosen.some((c) => c.id === item.id)}
-                onChange={() => toggle(item)}
-                className="rounded text-primary focus:ring-primary"
-              />
-              <span className="truncate">{item.name}</span>
-            </label>
-          ))}
+        <div className="max-h-72 space-y-1 overflow-y-auto rounded-md border border-slate-200 bg-white p-1">
+          {candidates.map((item) => {
+            const image = item.images
+              ?.filter((candidate) => !candidate.archivedAt)
+              .sort(
+                (left, right) =>
+                  Number(right.isPrimary) - Number(left.isPrimary) ||
+                  (left.sortOrder ?? 0) - (right.sortOrder ?? 0),
+              )[0];
+            const selected = chosen.some((candidate) => candidate.id === item.id);
+            return (
+              <label
+                key={item.id}
+                className={`flex cursor-pointer select-none items-center gap-3 rounded-md border px-2 py-2 transition-colors ${
+                  selected ? 'border-primary/30 bg-primary/5' : 'border-transparent hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  data-testid={`card-candidate-${item.id}`}
+                  checked={selected}
+                  onChange={() => toggle(item)}
+                  className="rounded text-primary focus:ring-primary"
+                />
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+                  {image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={image.url} alt="" className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="px-1 text-center text-[9px] font-medium text-slate-400">
+                      {t('No Image')}
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-slate-800">{item.name}</span>
+                  <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                    {item.sku && <span>SKU: {item.sku}</span>}
+                    <span>
+                      {Number(item.price ?? 0).toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+                    </span>
+                  </span>
+                </span>
+              </label>
+            );
+          })}
+          {!searching && candidates.length === 0 && (
+            <p className="px-3 py-6 text-center text-xs text-slate-500">{t('No matching products.')}</p>
+          )}
         </div>
       </div>
 

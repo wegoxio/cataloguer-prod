@@ -254,25 +254,9 @@ export default function ProductForm({
         error={errors.description?.message}
         {...register('description')}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-slate-50 rounded-md border border-slate-100">
-        <Input
-          label="SEO Title (max 160)"
-          placeholder="Defaults to the product name"
-          maxLength={160}
-          error={errors.metaTitle?.message}
-          {...register('metaTitle')}
-        />
-        <Input
-          label="SEO Description (max 300)"
-          placeholder="Defaults to the description"
-          maxLength={300}
-          error={errors.metaDescription?.message}
-          {...register('metaDescription')}
-        />
-        <p className="text-[11px] text-slate-400 md:col-span-2 -mt-2">
-          {t('How this product looks on Google: the title is the blue link, the description the grey text under it. Left empty, Google uses the name and description.')}
-        </p>
-      </div>
+      {/* Hidden so editing operational data preserves any metadata already stored. */}
+      <input type="hidden" {...register('metaTitle')} />
+      <input type="hidden" {...register('metaDescription')} />
 
       {!isCard && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -370,14 +354,14 @@ export default function ProductForm({
         </div>
       ) : (
         <>
-          <p className="text-[11px] text-slate-400 -mb-2">
+          <p className="text-[11px] leading-5 text-slate-500">
             {t('The company base price. A branch may charge something else — see "Set by each branch" below.')}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
               type="number"
               step="0.01"
-              label="Regular Price ($)"
+              label={t('Base price ($)')}
               placeholder="0.00"
               error={errors.price?.message}
               {...register('price')}
@@ -385,7 +369,7 @@ export default function ProductForm({
             <Input
               type="number"
               step="0.01"
-              label="Sale Price ($)"
+              label={t('Sale price ($) — optional')}
               placeholder="No sale"
               error={errors.salePrice?.message}
               {...register('salePrice')}
@@ -393,7 +377,7 @@ export default function ProductForm({
             <Input
               type="number"
               step="0.01"
-              label="Cost ($) — internal"
+              label={t('Internal cost ($) — optional')}
               placeholder="Internal cost"
               error={errors.cost?.message}
               {...register('cost')}
@@ -406,20 +390,20 @@ export default function ProductForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
         <Input
           type="number"
-          label="Opening stock"
+          label={t('Initial company stock')}
           placeholder="0"
           error={errors.stockQuantity?.message}
           {...register('stockQuantity')}
         />
         <div className="flex items-center pt-4">
-          <Checkbox label="Track Inventory" {...register('trackInventory')} />
+          <Checkbox label={t('Control stock availability')} {...register('trackInventory')} />
         </div>
       </div>
       )}
       {!isCard && (
-      <p className="text-[11px] text-slate-400 -mt-2" data-testid="form-stock-note">
+      <p className="text-[11px] leading-5 text-slate-500" data-testid="form-stock-note">
         {t(
-          'Stock is held by a BRANCH, never by the company as a whole. This is the opening figure; afterwards each branch holds its own units and what is sellable right now is worked out from the ledger.',
+          'This opening quantity is recorded for the company before distribution. Sellable stock is held by a BRANCH and calculated from the inventory ledger; assign it later from Inventory or the product detail.',
         )}
       </p>
       )}
@@ -479,7 +463,8 @@ export default function ProductForm({
           )}
         </p>
         <p className="text-[10px] font-semibold text-slate-500 uppercase pt-1">
-          Visible in stores {storeIds.length === 0 && '— none selected: this product will appear on NO website'}
+          {t('Publish on websites')}{' '}
+          {storeIds.length === 0 && t('— none selected: this product will appear on no website')}
         </p>
         <div className="space-y-2">
           {activeStores.map((store) => (
@@ -518,7 +503,7 @@ export default function ProductForm({
             </div>
           ))}
           <p className="text-[10px] text-slate-400">
-            Optional per-store price override — leave empty to use the product&apos;s base price. Variant prices are global.
+            {t("Optional price per website — leave it empty to use the product's base price. Variant prices remain independent.")}
           </p>
         </div>
       </div>

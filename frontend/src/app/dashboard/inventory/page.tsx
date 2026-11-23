@@ -221,15 +221,15 @@ export default function InventoryPage() {
   const locationName = (id: string) => locations.find((location) => location.id === id)?.name ?? id;
 
   return (
-    <div>
+    <div className="mx-auto max-w-[1600px] space-y-5 dashboard-stagger">
       <PageHeader
         title={t('Inventory')}
-        description={t('What the company owns, what each branch holds, and what can actually be sold.')}
+        description={t('Review actual stock, availability and movements for each product and branch.')}
         crumbs={[{ label: t('Dashboard'), href: '/dashboard' }, { label: t('Inventory') }]}
         actions={
           mayCommand ? (
             <Button variant="secondary" isLoading={busy} onClick={runReconciliation}>
-              <ClipboardCheck className="h-3.5 w-3.5" /> {t('Check the books')}
+              <ClipboardCheck className="h-3.5 w-3.5" /> {t('Verify stock consistency')}
             </Button>
           ) : undefined
         }
@@ -237,7 +237,7 @@ export default function InventoryPage() {
 
       {findings !== null && (
         <div
-          className={`mb-4 rounded-lg border px-3 py-2 text-xs ${
+          className={`dashboard-card-enter rounded-xl border px-4 py-3 text-sm ${
             findings.length === 0
               ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
               : 'border-amber-200 bg-amber-50 text-amber-900'
@@ -262,7 +262,7 @@ export default function InventoryPage() {
         </div>
       )}
 
-      <div className="card p-4 space-y-3">
+      <div className="card dashboard-card-enter p-4 sm:p-5 space-y-3">
         <label className="block">
           <span className="text-[10px] font-semibold text-slate-500 uppercase">{t('Find an item')}</span>
           <div className="relative mt-1">
@@ -293,10 +293,37 @@ export default function InventoryPage() {
             ))}
           </ul>
         )}
+        {debouncedSearch.trim().length >= 2 && searchQuery.isPending && (
+          <div className="space-y-2" aria-label={t('Loading products')}>
+            {[0, 1, 2].map((row) => <div key={row} className="h-10 animate-pulse rounded-lg bg-slate-100" />)}
+          </div>
+        )}
+        {debouncedSearch.trim().length >= 2 && searchQuery.isError && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <span>{t('Products could not be loaded.')}</span>
+            <Button size="sm" variant="secondary" onClick={() => searchQuery.refetch()}>{t('Retry')}</Button>
+          </div>
+        )}
+        {!selected && debouncedSearch.trim().length < 2 && (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-6 text-center">
+            <Search className="mx-auto h-6 w-6 text-slate-300" aria-hidden="true" />
+            <p className="mt-2 text-sm font-semibold text-slate-700">{t('Find a product to review its inventory')}</p>
+            <p className="mt-1 text-xs text-slate-500">{t('Enter at least two characters, then select a result.')}</p>
+          </div>
+        )}
       </div>
 
+      {selected && stockQuery.isPending && (
+        <div className="card dashboard-card-enter p-5 space-y-4" aria-label={t('Loading inventory')}>
+          <div className="h-5 w-48 animate-pulse rounded bg-slate-100" />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((cell) => <div key={cell} className="h-20 animate-pulse rounded-xl bg-slate-100" />)}
+          </div>
+        </div>
+      )}
+
       {selected && stock && (
-        <div className="card p-4 mt-4 space-y-4" data-testid="product-inventory">
+        <div className="card dashboard-card-enter p-4 sm:p-5 space-y-4" data-testid="product-inventory">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-sm font-bold text-slate-800">{selected.name}</h2>
@@ -365,8 +392,8 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {mayCommand && (
-        <div className="card p-4 mt-4 space-y-2" data-testid="transfers">
+      {mayCommand && transfers.length > 0 && (
+        <div className="card dashboard-card-enter p-4 sm:p-5 space-y-2" data-testid="transfers">
           <div className="flex items-center gap-2">
             <ArrowLeftRight className="h-4 w-4 text-primary" aria-hidden="true" />
             <h2 className="text-sm font-bold text-slate-800">{t('Transfers')}</h2>
@@ -374,10 +401,7 @@ export default function InventoryPage() {
           <p className="text-[11px] text-slate-400">
             {t('Stock moving between the warehouse and a branch, or between branches. Each step is recorded.')}
           </p>
-          {transfers.length === 0 ? (
-            <p className="text-xs text-slate-400">{t('No transfers yet.')}</p>
-          ) : (
-            <ul className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
+          <ul className="divide-y divide-slate-100 border border-slate-100 rounded-lg overflow-hidden">
               {transfers.map((transfer) => (
                 <li key={transfer.id} className="px-3 py-2 flex items-center justify-between gap-3 text-sm bg-white">
                   <div className="min-w-0">
@@ -426,8 +450,7 @@ export default function InventoryPage() {
                   </div>
                 </li>
               ))}
-            </ul>
-          )}
+          </ul>
         </div>
       )}
 

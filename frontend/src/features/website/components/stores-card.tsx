@@ -177,8 +177,8 @@ export default function StoresCard({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <section className="dashboard-card-enter space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-slate-800">{t('Websites')}</h3>
           <Badge variant="info">{t('sales channels')}</Badge>
@@ -189,7 +189,7 @@ export default function StoresCard({
           </Button>
         )}
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="max-w-4xl text-xs leading-5 text-slate-500">
         {t('Each website is a sales channel with its own connection and API key. Which products each website shows is configured per product.')}
       </p>
 
@@ -213,7 +213,7 @@ export default function StoresCard({
       {stores.length === 0 ? (
         <EmptyState message={t('No websites yet.')} />
       ) : (
-        <Table>
+        <Table wrapperProps={{ role: 'region', 'aria-label': t('Websites') }}>
           <THead>
             <TH>{t('Name')}</TH>
             <TH>{t('Website')}</TH>
@@ -300,7 +300,7 @@ export default function StoresCard({
         onClose={() => setIsFormOpen(false)}
       >
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label={t('Name')} placeholder={t('e.g. Downtown Store')} error={errors.name?.message} {...register('name')} />
           </div>
           <Input
@@ -310,7 +310,7 @@ export default function StoresCard({
             {...register('websiteUrl')}
           />
           {isPlatformOwner && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Input
                 label={t('Product URL pattern')}
                 placeholder="/products/{slug}"
@@ -356,6 +356,6 @@ export default function StoresCard({
         onConfirm={handleArchive}
         onCancel={() => setArchiveTarget(null)}
       />
-    </div>
+    </section>
   );
 }

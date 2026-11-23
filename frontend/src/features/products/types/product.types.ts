@@ -40,6 +40,14 @@ export interface Product {
   cost?: number | null;
   stockQuantity?: number;
   trackInventory?: boolean;
+  images?: {
+    id: string;
+    url: string;
+    altText?: string | null;
+    isPrimary: boolean;
+    archivedAt?: string | null;
+    sortOrder?: number;
+  }[];
 }
 
 export interface BulkResult {

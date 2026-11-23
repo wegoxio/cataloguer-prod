@@ -1354,17 +1354,19 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">{t('Items')}</h2>
-          <p className="text-xs text-slate-500 mt-1">{t('Everything your websites can show: products, dishes, services, gallery pieces')}</p>
+          <h2 className="text-xl font-bold text-slate-800">{t('Products')}</h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            {t('Gestiona productos, variantes, imágenes, categorías, precios, publicación e inventario desde un solo lugar.')}
+          </p>
         </div>
         {/* Named, because it is no longer the only Add Item on the page: the
             true-empty state offers one too, and addressing either by its label
             alone is ambiguous the moment the catalogue is empty. */}
         {canManage && (
           <Button data-testid="add-item" tooltip={t('Create a new item in the catalog')} onClick={startCreate}>
-            {t('Add Item')}
+            {t('Add Product')}
           </Button>
         )}
       </div>
@@ -1687,7 +1689,7 @@ export default function ProductsPage() {
           setIsFormOpen(false);
           setEditingProduct(null);
         }}
-        className="max-w-3xl"
+        className="max-w-4xl"
       >
         {editingProduct && canManage && (
           <div className="flex items-center justify-between gap-3 flex-wrap mb-4 pb-4 border-b border-slate-100">

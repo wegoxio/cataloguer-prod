@@ -5,7 +5,6 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Input from '../../../components/ui/input';
-import Select from '../../../components/ui/select';
 import Textarea from '../../../components/ui/textarea';
 import Button from '../../../components/ui/button';
 import { SearchableSelect } from '../../../components/ui/searchable-select';
@@ -63,12 +62,16 @@ export default function CategoryForm({
   const [removeImage, setRemoveImage] = React.useState(false);
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(initialValues?.imageUrl ?? null);
   const [channels, setChannels] = React.useState<Array<{ id: string; name: string; key: string }>>([]);
+  const [channelsLoading, setChannelsLoading] = React.useState(Boolean(token && storeId));
+  const [channelsError, setChannelsError] = React.useState<string | null>(null);
   const [initialChannelIds, setInitialChannelIds] = React.useState<Set<string>>(new Set());
   const [channelIds, setChannelIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
     if (!token || !storeId) return;
     let active = true;
+    setChannelsLoading(true);
+    setChannelsError(null);
     apiFetch(`/stores/${storeId}/catalogue-navigation`, { token }).then((response) => {
       if (!active) return;
       const snapshot = response.data as {
@@ -86,7 +89,12 @@ export default function CategoryForm({
       );
       setInitialChannelIds(selected);
       setChannelIds(new Set(selected));
-    }).catch(() => undefined);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setChannelsError(error instanceof Error ? error.message : 'Channels could not be loaded');
+    }).finally(() => {
+      if (active) setChannelsLoading(false);
+    });
     return () => { active = false; };
   }, [initialValues?.id, storeId, token]);
 
@@ -131,8 +139,14 @@ export default function CategoryForm({
       channelChanges: channels
         .filter((channel) => initialChannelIds.has(channel.id) !== channelIds.has(channel.id))
         .map((channel) => ({ channelId: channel.id, visible: channelIds.has(channel.id) })),
-    }))} className="space-y-4">
-      <Input label="Name" placeholder="e.g. Shirts" error={errors.name?.message} {...register('name')} />
+    }))} className="space-y-5">
+      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+        <div>
+          <h4 className="text-sm font-semibold text-slate-800">Basic information</h4>
+          <p className="mt-1 text-xs text-slate-500">The name is required. All other descriptive fields are optional.</p>
+        </div>
+        <Input label="Name *" placeholder="e.g. Shirts" error={errors.name?.message} {...register('name')} />
+      </section>
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
         <p className="text-xs font-semibold text-slate-700">Category image</p>
         <p className="mt-1 text-[11px] text-slate-500">
@@ -181,6 +195,12 @@ export default function CategoryForm({
         </div>
       </div>
 
+      {channelsLoading && <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-500" role="status">Loading publication channelsâ€¦</p>}
+      {channelsError && (
+        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">
+          {channelsError}. Saving is disabled so the existing channel configuration is not overwritten.
+        </p>
+      )}
       {channels.length > 0 && (
         <fieldset className="rounded-md border border-slate-200 bg-slate-50 p-3">
           <legend className="px-1 text-xs font-semibold text-slate-700">Publish in storefront channels</legend>
@@ -213,24 +233,12 @@ export default function CategoryForm({
         error={errors.description?.message}
         {...register('description')}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-slate-50 rounded-md border border-slate-100">
-        <Input
-          label="SEO Title (max 160)"
-          placeholder="Defaults to the category name"
-          maxLength={160}
-          error={errors.metaTitle?.message}
-          {...register('metaTitle')}
-        />
-        <Input
-          label="SEO Description (max 300)"
-          placeholder="Defaults to the description"
-          maxLength={300}
-          error={errors.metaDescription?.message}
-          {...register('metaDescription')}
-        />
-      </div>
+      {/* Keep previously stored metadata when another field is edited. */}
+      <input type="hidden" {...register('metaTitle')} />
+      <input type="hidden" {...register('metaDescription')} />
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 rounded-xl border border-slate-200 bg-white p-4">
+        <h4 className="text-sm font-semibold text-slate-800">Hierarchy</h4>
         <Controller
           name="parentCategoryId"
           control={control}
@@ -251,44 +259,26 @@ export default function CategoryForm({
         <p className="text-[11px] leading-4 text-slate-500">
           This only defines the category hierarchy. Storefront visibility is controlled by the channel and navigation-group configuration.
         </p>
+        {initialValues && <p className="text-[11px] leading-4 text-slate-500">This category and its descendants are omitted from the choices to prevent a circular hierarchy.</p>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Select label="Type of grouping" error={errors.kind?.message} {...register('kind')}>
-          <option value="">Unclassified</option>
-          <option value="PRODUCT_TYPE">Product type</option>
-          <option value="BRAND">Brand</option>
-          <option value="DESIGNER">Designer</option>
-          <option value="COLLECTION">Collection</option>
-          <option value="MERCHANDISING">Merchandising group</option>
-        </Select>
-        <Input
-          label="Storefront heading (optional)"
-          placeholder="Leave blank to use the name"
-          error={errors.publicLabel?.message}
-          {...register('publicLabel')}
-        />
-      </div>
+      {/*
+        Presentation metadata stays in the contract for existing API clients,
+        but it is not part of this operational form. The channel navigation
+        screen is the single place where staff set the public label, visibility
+        and order. Hidden controls preserve existing values during unrelated
+        edits instead of silently resetting them.
+      */}
+      <input type="hidden" {...register('kind')} />
+      <input type="hidden" {...register('publicLabel')} />
+      <input type="hidden" {...register('sortOrder')} />
+      <input type="checkbox" className="hidden" aria-hidden="true" tabIndex={-1} {...register('showInNavigation')} />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          type="number"
-          min={0}
-          label="Position among siblings"
-          error={errors.sortOrder?.message}
-          {...register('sortOrder')}
-        />
-        <label className="flex items-center gap-2 text-sm text-slate-700 pt-6">
-          <input type="checkbox" className="rounded border-slate-300" {...register('showInNavigation')} />
-          Show in storefront navigation
-        </label>
-      </div>
-
-      <div className="flex justify-end gap-2 pt-4 border-t border-slate-100">
+      <div className="sticky bottom-0 z-10 -mx-1 flex justify-end gap-2 border-t border-slate-200 bg-white/95 px-1 pb-1 pt-4 backdrop-blur">
         <Button type="button" variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={categoriesLoading || Boolean(categoriesError)} isLoading={isSubmitting}>
+        <Button type="submit" disabled={categoriesLoading || Boolean(categoriesError) || channelsLoading || Boolean(channelsError)} isLoading={isSubmitting}>
           Save Category
         </Button>
       </div>

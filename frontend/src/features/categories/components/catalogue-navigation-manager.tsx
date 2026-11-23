@@ -220,38 +220,45 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
   }
 
   return (
-    <section className="space-y-5 rounded-md border border-slate-200 bg-white p-5">
-      <div>
-        <h3 className="font-semibold text-slate-800">Navegación pública del catálogo</h3>
-        <p className="mt-1 text-xs text-slate-500">Canales, categorías y portadas configurables por tienda, sin reglas específicas de ningún cliente.</p>
-      </div>
+    <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
       {error && <div className="rounded border border-red-200 bg-red-50 p-3 text-xs text-red-700">{error}</div>}
 
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <Input label="Nombre del canal" value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="Ej. Catálogo principal" />
-        <Input label="Clave estable" value={channelKey} onChange={(event) => setChannelKey(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} placeholder="catalogo-principal" />
-        <div className="self-end">
-          <Button disabled={busy || !channelName || !channelKey} onClick={() => mutate(async () => {
-            await apiFetch(`/stores/${storeId}/catalogue-navigation/channels`, { method: 'POST', token, body: JSON.stringify({ name: channelName, key: channelKey }) });
-            setChannelName('');
-            setChannelKey('');
-          })}>Crear canal</Button>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="grid items-end gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <label className="block text-xs font-semibold text-slate-600">
+            Canal que estás configurando
+            <select className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm" value={channelId} onChange={(event) => { setChannelId(event.target.value); setSelectedGroup(''); }}>
+              {snapshot.channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name} ({channel.key})</option>)}
+            </select>
+          </label>
+          <span className="rounded-full bg-white px-3 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+            {orderedNavigationGroups.length} categorías en navegación · {draftVisibleIds.length} visibles
+          </span>
         </div>
+        <p className="mt-2 text-xs text-slate-500">Todos los cambios de orden y visibilidad que hagas debajo se aplican únicamente a este canal.</p>
       </div>
 
-      <label className="block text-xs font-semibold text-slate-600">
-        Canal activo
-        <select className="mt-1 block w-full rounded border border-slate-300 bg-white p-2 text-sm" value={channelId} onChange={(event) => { setChannelId(event.target.value); setSelectedGroup(''); }}>
-          {snapshot.channels.map((channel) => <option key={channel.id} value={channel.id}>{channel.name} ({channel.key})</option>)}
-        </select>
-      </label>
+      <details className="rounded-lg border border-slate-200 bg-white">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-slate-700">Administrar canales</summary>
+        <div className="grid gap-3 border-t border-slate-100 p-4 md:grid-cols-[1fr_1fr_auto]">
+          <Input label="Nombre del canal" value={channelName} onChange={(event) => setChannelName(event.target.value)} placeholder="Ej. Catálogo principal" />
+          <Input label="Clave estable" value={channelKey} onChange={(event) => setChannelKey(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} placeholder="catalogo-principal" />
+          <div className="self-end">
+            <Button disabled={busy || !channelName || !channelKey} onClick={() => mutate(async () => {
+              await apiFetch(`/stores/${storeId}/catalogue-navigation/channels`, { method: 'POST', token, body: JSON.stringify({ name: channelName, key: channelKey }) });
+              setChannelName('');
+              setChannelKey('');
+            })}>Crear canal</Button>
+          </div>
+        </div>
+      </details>
 
       {channelId && <>
         <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-4">
-          <h4 className="text-sm font-semibold text-slate-800">Orden de categorias en el sitio</h4>
+          <h4 className="text-sm font-semibold text-slate-800">Categorías del menú</h4>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="mt-1 max-w-2xl text-xs text-slate-500">
-              Elige cuáles aparecen en este catálogo y arrástralas hasta obtener el orden deseado. Nada se modifica en DesignHof hasta pulsar Guardar configuración.
+              Arrastra las categorías para ordenarlas y usa “Mostrar” para decidir si aparecen en este canal. Los cambios no se publican hasta que pulses Guardar configuración.
             </p>
             <div className="flex gap-2">
               <Button type="button" size="sm" variant="secondary" disabled={busy || !navigationConfigurationChanged} onClick={resetDraftOrder}>
@@ -349,9 +356,15 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
           </div>
         </div>
 
+        <details className="rounded-lg border border-slate-200 bg-white">
+          <summary className="cursor-pointer px-4 py-3">
+            <span className="text-sm font-semibold text-slate-800">Opciones avanzadas del canal</span>
+            <span className="ml-2 text-xs font-normal text-slate-500">Nombres públicos, portadas y agrupaciones</span>
+          </summary>
+          <div className="space-y-6 border-t border-slate-100 p-4">
         <div>
-          <h4 className="mb-1 text-sm font-semibold text-slate-700">Categorías publicadas</h4>
-          <p className="mb-3 text-xs text-slate-500">La imagen propia de la categoría tiene prioridad. El producto de portada se conserva únicamente como respaldo para categorías antiguas sin imagen.</p>
+          <h4 className="mb-1 text-sm font-semibold text-slate-700">Detalles de categorías publicadas</h4>
+          <p className="mb-3 text-xs text-slate-500">Personaliza el nombre y la portada únicamente cuando el valor general de la categoría no sea suficiente.</p>
           <div className="grid max-h-[32rem] gap-3 overflow-auto rounded border border-slate-200 p-3 md:grid-cols-2">
             {categories.map((category) => {
               const publication = publications.get(category.id);
@@ -431,6 +444,8 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
             </div>
           </div>}
         </div>
+          </div>
+        </details>
       </>}
     </section>
   );

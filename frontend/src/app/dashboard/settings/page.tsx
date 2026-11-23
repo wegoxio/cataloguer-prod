@@ -53,7 +53,7 @@ const HIDEABLE_MODULES: Array<{ key: string; label: string }> = [
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 pt-2">{children}</h3>
+    <h3 className="pt-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-400">{children}</h3>
   );
 }
 
@@ -61,22 +61,27 @@ function Card({
   icon: Icon,
   title,
   badge,
+  id,
+  description,
+  className = '',
   children,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   badge?: React.ReactNode;
+  id?: string;
+  description?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="card overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-bold text-slate-800">{title}</h3>
-        {badge}
+    <section id={id} className={`card dashboard-card-enter scroll-mt-6 overflow-hidden ${className}`}>
+      <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50/40 px-5 py-4 sm:px-6">
+        <span className="rounded-xl bg-primary/[0.08] p-2 text-primary"><Icon className="h-4 w-4" /></span>
+        <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-bold text-slate-900">{title}</h3>{badge}</div>{description && <p className="mt-1 text-xs text-slate-500">{description}</p>}</div>
       </div>
-      <div className="p-5">{children}</div>
-    </div>
+      <div className="p-5 sm:p-6">{children}</div>
+    </section>
   );
 }
 
@@ -88,6 +93,7 @@ export default function SettingsPage() {
   const { stores } = useStores();
 
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState('profile-settings');
   const [profile, setProfile] = useState({ firstName: '', lastName: '' });
   const [profileSaving, setProfileSaving] = useState(false);
 
@@ -416,17 +422,39 @@ export default function SettingsPage() {
         : t('Viewer');
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <div>
-        <h2 className="text-xl font-bold text-slate-800">{t('Settings')}</h2>
-        <p className="text-xs text-slate-500 mt-1">
+    <div className="mx-auto max-w-[1500px] space-y-6 dashboard-stagger">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t('Control center')}</p>
+        <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{t('Settings')}</h2>
+        <p className="mt-1 text-sm text-slate-500">
           {t('Your account, your company and your plan — all in one place.')}
         </p>
-      </div>
+      </header>
 
-      <SectionTitle>{t('Your account')}</SectionTitle>
-      <div className="space-y-5">
-        <Card icon={UserRound} title={t('Profile')}>
+      <div className="grid items-start gap-6 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="card dashboard-card-enter p-3 lg:sticky lg:top-4">
+          <p className="px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{t('Settings sections')}</p>
+          <nav className="space-y-1" role="tablist" aria-orientation="vertical">
+            {[
+              { href: '#profile-settings', icon: UserRound, label: t('Profile') },
+              { href: '#language-settings', icon: Languages, label: t('Language') },
+              { href: '#security-settings', icon: ShieldCheck, label: t('Security') },
+              ...(canEditCompany ? [{ href: '#company-settings', icon: Building2, label: t('Your company') }, { href: '#customization-settings', icon: SlidersHorizontal, label: t('Customization') }] : []),
+              ...(showsCommercialTerms ? [{ href: '#plan-settings', icon: BadgeCheck, label: t('Your plan') }] : []),
+              ...(canEditGlobal ? [{ href: '#platform-settings', icon: Building2, label: t('Platform') }] : []),
+            ].map(({ href, icon: Icon, label }) => {
+              const section = href.slice(1);
+              const active = activeSection === section;
+              return <button key={href} type="button" role="tab" aria-selected={active} aria-controls={section} onClick={() => setActiveSection(section)} className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors ${active ? 'bg-primary text-white shadow-sm' : 'text-slate-600 hover:bg-primary/[0.06] hover:text-primary'}`}><Icon className="h-4 w-4" />{label}</button>;
+            })}
+          </nav>
+          <div className="mt-3 rounded-xl bg-slate-50 p-3"><p className="truncate text-xs font-semibold text-slate-700">{user.email}</p><p className="mt-0.5 text-[11px] text-slate-500">{roleLabel}</p></div>
+        </aside>
+        <main className="min-w-0 space-y-5">
+
+      {['profile-settings', 'language-settings', 'security-settings'].includes(activeSection) && <SectionTitle>{t('Your account')}</SectionTitle>}
+      <div>
+        <Card className={activeSection === 'profile-settings' ? '' : 'hidden'} id="profile-settings" icon={UserRound} title={t('Profile')} description={t('Manage your identity and sign-in email.')}>
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="text-xs text-slate-500">
@@ -468,7 +496,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card icon={Languages} title={t('Language')}>
+        <Card className={activeSection === 'language-settings' ? '' : 'hidden'} id="language-settings" icon={Languages} title={t('Language')} description={t('Choose the language used by this dashboard.')}>
             <div className="flex items-center justify-between gap-4">
               <p className="text-xs text-slate-500">{t('Applies to this browser only — every user picks their own.')}</p>
               <div className="flex rounded-md border border-slate-200 overflow-hidden shrink-0">
@@ -488,7 +516,7 @@ export default function SettingsPage() {
             </div>
           </Card>
 
-          <Card icon={ShieldCheck} title={t('Security')}>
+          <Card className={activeSection === 'security-settings' ? '' : 'hidden'} id="security-settings" icon={ShieldCheck} title={t('Security')} description={t('Protect your account and review active sessions.')}>
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <p className="text-xs text-slate-500">{t('Changing your password signs you out everywhere else.')}</p>
@@ -563,9 +591,9 @@ export default function SettingsPage() {
 
       {canEditCompany && (
         <>
-          <SectionTitle>{t('Your company')}</SectionTitle>
-          <div className="space-y-5">
-            <Card icon={Building2} title={t('Company details')}>
+          {['company-settings', 'customization-settings'].includes(activeSection) && <SectionTitle>{t('Your company')}</SectionTitle>}
+          <div>
+            <Card className={activeSection === 'company-settings' ? '' : 'hidden'} id="company-settings" icon={Building2} title={t('Company details')} description={t('Public contact information for your company.')}>
               <div className="space-y-3">
                 <Input
                   label={t('Company Name')}
@@ -600,7 +628,7 @@ export default function SettingsPage() {
               </div>
             </Card>
 
-            <Card icon={SlidersHorizontal} title={t('Customization')}>
+            <Card className={activeSection === 'customization-settings' ? '' : 'hidden'} id="customization-settings" icon={SlidersHorizontal} title={t('Customization')} description={t('Decide which modules appear in the main navigation.')}>
               <div className="space-y-3">
                 <p className="text-xs text-slate-500">
                   {t('Hide the modules your business does not use — the sidebar gets simpler and nothing is deleted. Turn them back on any time.')}
@@ -651,8 +679,11 @@ export default function SettingsPage() {
       {showsCommercialTerms && (
         <div className="space-y-5">
           <Card
+            id="plan-settings"
+            className={activeSection === 'plan-settings' ? '' : 'hidden'}
             icon={BadgeCheck}
             title={t('Your plan')}
+            description={t('Review your subscription capacity and billing status.')}
             badge={
               // null while loading: stay on "Active" so the card never
               // flashes a payment warning the company doesn't have
@@ -707,8 +738,8 @@ export default function SettingsPage() {
 
       {canEditGlobal && (
         <>
-          <SectionTitle>{t('Platform')}</SectionTitle>
-          <Card icon={Building2} title={t('Global Settings')}>
+          {activeSection === 'platform-settings' && <SectionTitle>{t('Platform')}</SectionTitle>}
+          <Card className={activeSection === 'platform-settings' ? '' : 'hidden'} id="platform-settings" icon={Building2} title={t('Global Settings')} description={t('Defaults and announcements shared across the platform.')}>
             {error && (
               <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-md">{error}</div>
             )}
@@ -752,6 +783,9 @@ export default function SettingsPage() {
           </Card>
         </>
       )}
+
+        </main>
+      </div>
 
       <ChangePasswordModal
         open={isPasswordOpen}

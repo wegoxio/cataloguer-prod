@@ -50,9 +50,8 @@ export default function WebsiteCataloguePage() {
         )}
       </div>
 
-      <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-xs leading-5 text-blue-900">
-        <strong>Publicar una categoría:</strong> selecciona el canal que consume la página web y marca la categoría en “Categorías publicadas”.
-        Para DesignHof, el canal principal es <code className="rounded bg-white/70 px-1">mobiliario</code>.
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <strong>Flujo de publicación:</strong> selecciona un canal → añade las categorías que mostrará → ordénalas y define su visibilidad → guarda la configuración.
       </div>
 
       <CatalogueNavigationManager token={accessToken} storeId={storeId} />

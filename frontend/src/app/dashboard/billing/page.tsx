@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Receipt } from 'lucide-react';
+import { CreditCard, Globe2, Receipt, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '../../../lib/auth';
 import { canViewSubscription, isUnscopedPlatformOwner } from '../../../lib/permissions';
 import { apiFetch } from '../../../lib/api-client';
@@ -128,11 +128,12 @@ export default function BillingPage() {
   if (!user) return null;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="mx-auto max-w-[1600px] space-y-6 dashboard-stagger">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-800">{t('Billing')}</h2>
-          <p className="text-xs text-slate-500 mt-1">{t('Your subscription and payment history')}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{t('Subscription')}</p>
+          <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{t('Billing and plans')}</h2>
+          <p className="mt-1 text-sm text-slate-500">{t('Manage your current plan, usage, payments and available upgrades.')}</p>
         </div>
         {isOwner && (
           <Button size="sm" tooltip={t('Record a payment received outside the platform')} onClick={() => setIsRecordOpen(true)}>
@@ -143,14 +144,27 @@ export default function BillingPage() {
 
       {/* Subscription — organization-level, and only for actors entitled to it */}
       {(showSubscription || isOwner) && (
-      <div className="card overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+      <div className="card dashboard-card-enter overflow-hidden border-primary/10">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-gradient-to-r from-primary/[0.06] to-transparent sm:px-6">
           <CreditCard className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-bold text-slate-800">{t('My subscription')}</h3>
         </div>
-        <div className="p-5">
-          {subscription === null ? (
-            <p className="text-xs text-slate-400">{t('Loading…')}</p>
+        <div className="p-5 sm:p-6">
+          {billingQuery.isPending ? (
+            <div className="space-y-5" aria-label={t('Loading subscription')}>
+              <div className="h-8 w-48 animate-pulse rounded bg-slate-100" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
+                <div className="h-20 animate-pulse rounded-xl bg-slate-100" />
+              </div>
+            </div>
+          ) : billingQuery.isError ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 p-4 text-sm text-red-700">
+              <span>{t('Billing information could not be loaded.')}</span>
+              <Button size="sm" variant="secondary" onClick={() => billingQuery.refetch()}>{t('Retry')}</Button>
+            </div>
+          ) : subscription === null ? (
+            <p className="text-xs text-slate-400">{t('No subscription information is available.')}</p>
           ) : subscription.platformOwner ? (
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm text-slate-600">{t('Platform owner — full access to every plan and client.')}</p>
@@ -160,10 +174,11 @@ export default function BillingPage() {
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold text-slate-800" data-testid="billing-current-plan">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t('Current plan')}</p>
+                  <p className="mt-1 text-2xl font-bold text-slate-900" data-testid="billing-current-plan">
                     {/^plan\b/i.test(subscription.plan.name) ? subscription.plan.name : `${t('Plan')} ${subscription.plan.name}`}
                   </p>
-                  <p className="text-xs text-slate-500 mt-0.5" data-testid="billing-current-price">
+                  <p className="mt-1 text-sm text-slate-500" data-testid="billing-current-price">
                     {subscription.plan.complimentary
                       ? t('Free')
                       : subscription.plan.priceUsd !== null
@@ -205,17 +220,17 @@ export default function BillingPage() {
                   {stripeInfo.cardLast4 ? ` — ${t('card')} •••• ${stripeInfo.cardLast4}` : ''}
                 </p>
               )}
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-slate-50 rounded-md p-3">
-                  <p className="text-xs text-slate-400">{t('Team members')}</p>
-                  <p className="font-bold text-slate-800">
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="flex items-center gap-2 text-slate-500"><Users className="h-4 w-4 text-primary" /><p className="text-xs font-semibold">{t('Team members')}</p></div>
+                  <p className="mt-2 text-lg font-bold text-slate-800">
                     {subscription.usage.teamUsers}
                     <span className="text-slate-400 font-normal"> / {subscription.usage.maxTeamUsers ?? '∞'}</span>
                   </p>
                 </div>
-                <div className="bg-slate-50 rounded-md p-3">
-                  <p className="text-xs text-slate-400">{t('Websites')}</p>
-                  <p className="font-bold text-slate-800">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-4">
+                  <div className="flex items-center gap-2 text-slate-500"><Globe2 className="h-4 w-4 text-primary" /><p className="text-xs font-semibold">{t('Websites')}</p></div>
+                  <p className="mt-2 text-lg font-bold text-slate-800">
                     {subscription.usage.websites}
                     <span className="text-slate-400 font-normal"> / {subscription.usage.maxWebsites ?? '∞'}</span>
                   </p>
@@ -231,7 +246,7 @@ export default function BillingPage() {
           commercial terms see it at all. The owner-only "every company" table
           is gone with the unfiltered query that fed it. */}
       {showSubscription && (
-      <div className="card overflow-hidden">
+      <div className="card dashboard-card-enter overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
           <Receipt className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-bold text-slate-800">{t('Payment history')}</h3>
@@ -272,11 +287,12 @@ export default function BillingPage() {
 
       {/* Plans — inline comparison */}
       {subscription && !subscription.platformOwner && (
-        <div className="card overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
-            <h3 className="text-sm font-bold text-slate-800">{t('Plans')}</h3>
+        <div className="card dashboard-card-enter overflow-hidden">
+          <div className="px-5 py-5 border-b border-slate-100 sm:px-6">
+            <div className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /><h3 className="text-base font-bold text-slate-800">{t('Choose the plan that fits your growth')}</h3></div>
+            <p className="mt-1 text-xs text-slate-500">{t('Compare capacity and change plans without losing your catalogue data.')}</p>
           </div>
-          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="p-5 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:p-6">
             {subscription.planManagedByPlatform && (
               <p className="md:col-span-2 text-xs text-slate-500" data-testid="billing-plan-managed-note">
                 {t('To change your plan, contact your provider.')}
@@ -288,24 +304,24 @@ export default function BillingPage() {
                 <div
                   key={plan.key}
                   data-testid={`billing-plan-option-${plan.key}`}
-                  className={`rounded-lg border p-4 flex items-center justify-between gap-3 ${current ? 'border-primary bg-primary/5' : 'border-slate-200'}`}
+                  className={`flex min-h-[190px] flex-col rounded-2xl border p-5 transition-all ${current ? 'border-primary bg-primary/[0.04] shadow-sm ring-1 ring-primary/20' : 'border-slate-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md'}`}
                 >
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{plan.name}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-base font-bold text-slate-900">{plan.name}</p>
+                    <p className="mt-2 text-xs leading-relaxed text-slate-500">
                       {plan.maxWebsites === null && plan.maxTeamUsers === null
                         ? t('Custom websites & team members')
                         : `${plan.maxWebsites ?? '∞'} websites · ${plan.maxTeamUsers ?? '∞'} ${t('Team members').toLowerCase()}`}
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-slate-800">
+                  <div className="mt-auto pt-6">
+                    <p className="mb-3 text-xl font-bold text-slate-900">
                       {plan.priceUsd !== null ? `$${plan.priceUsd}/${t('month')}` : t('Custom pricing')}
                     </p>
                     {current ? (
                       <span className="text-[10px] font-semibold text-primary uppercase">{t('Your current plan')}</span>
                     ) : subscription.planManagedByPlatform ? null : plan.priceUsd !== null ? (
-                      <Button size="sm" onClick={() => payWithCard(plan.key)}>{t('Pay by card')}</Button>
+                      <Button className="w-full" size="sm" onClick={() => payWithCard(plan.key)}>{t('Pay by card')}</Button>
                     ) : (
                       <a className="text-xs font-semibold text-primary hover:underline" href={`mailto:contact.wegox@gmail.com?subject=${encodeURIComponent('Plan Corporativo — ' + (user?.company || ''))}`}>
                         {t('Request this plan')}

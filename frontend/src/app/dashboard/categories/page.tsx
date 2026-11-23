@@ -205,10 +205,12 @@ export default function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800">{t('Categories')}</h2>
-          <p className="text-xs text-slate-500 mt-1">{t('Manage catalogue categories and structures')}</p>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            {t('Organiza el catálogo, decide en qué canal aparece cada categoría y controla su posición en el sitio web.')}
+          </p>
         </div>
         {canManage && (
           <Button
@@ -224,11 +226,22 @@ export default function CategoriesPage() {
       </div>
 
       {canManage && accessToken && scope?.storeId && (
-        <CatalogueNavigationManager token={accessToken} storeId={scope.storeId} />
+        <section className="space-y-3">
+          <div>
+            <h3 className="text-base font-semibold text-slate-800">{t('Publicación y menú del sitio')}</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {t('Selecciona un canal, marca las categorías visibles, ordénalas y guarda una sola vez para actualizar el sitio.')}
+            </p>
+          </div>
+          <CatalogueNavigationManager token={accessToken} storeId={scope.storeId} />
+        </section>
       )}
 
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-md">{error}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-4 text-xs text-red-700" role="alert">
+          <span>{error}</span>
+          <Button variant="secondary" size="sm" onClick={() => categoriesQuery.refetch()}>{t('Retry')}</Button>
+        </div>
       )}
 
       {/* Filters */}
@@ -281,7 +294,9 @@ export default function CategoriesPage() {
       </div>
 
       {loading ? (
-        <div className="text-slate-500 text-sm">{t('Fetching category directory...')}</div>
+        <div className="space-y-2" role="status" aria-label={t('Fetching category directory...')}>
+          {[0, 1, 2, 3].map((row) => <div key={row} className="h-14 animate-pulse rounded-md border border-slate-100 bg-slate-50" />)}
+        </div>
       ) : (
         <div className="space-y-4">
           <CategoryTable
@@ -328,6 +343,7 @@ export default function CategoriesPage() {
       <Modal
         open={isFormOpen && canManage}
         title={editingCategory ? `Edit Category: ${editingCategory.name}` : 'New Category'}
+        className="max-w-3xl"
         onClose={() => {
           setIsFormOpen(false);
           setEditingCategory(null);

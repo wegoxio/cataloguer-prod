@@ -54,10 +54,34 @@ function actionVariant(action: string): 'success' | 'warning' | 'danger' | 'info
 /** Uniform KPI card for the top strip. */
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="card p-4">
+    <div className="card dashboard-card-enter min-h-28 p-4 sm:p-5">
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="text-2xl font-bold text-ink-strong tabular-nums mt-0.5">{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+      <p className="mt-2 text-2xl font-bold tabular-nums text-ink-strong sm:text-3xl">{value}</p>
+      {sub && <p className="mt-1 text-xs text-slate-500">{sub}</p>}
+    </div>
+  );
+}
+
+function Skeleton({ className }: { className: string }) {
+  return <div className={`animate-pulse rounded-md bg-slate-200/80 ${className}`} />;
+}
+
+function DashboardSkeleton({ showActivity }: { showActivity: boolean }) {
+  return (
+    <div className="space-y-6" role="status" aria-label="Cargando panel">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => <div key={item} className="card min-h-28 space-y-3 p-5"><Skeleton className="h-3 w-28" /><Skeleton className="h-8 w-24" /><Skeleton className="h-3 w-20" /></div>)}
+      </div>
+      <div className="space-y-3">
+        <Skeleton className="h-5 w-40" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((item) => <div key={item} className="card flex h-24 items-center gap-3 p-4"><Skeleton className="h-11 w-11" /><div className="flex-1 space-y-2"><Skeleton className="h-6 w-14" /><Skeleton className="h-3 w-3/4" /></div></div>)}
+        </div>
+      </div>
+      <div className={`grid gap-4 ${showActivity ? 'lg:grid-cols-2' : ''}`}>
+        <div className="card h-40 p-4"><Skeleton className="h-full w-full" /></div>
+        {showActivity && <div className="card h-40 p-4"><Skeleton className="h-full w-full" /></div>}
+      </div>
     </div>
   );
 }
@@ -102,8 +126,10 @@ function CatalogDashboard() {
   const lowStock = dashboard?.lowStock ?? null;
   const groupable = dashboard?.groupable ?? null;
 
+  const loading = dashboardQuery.isPending && !dashboard;
+
   return (
-    <div className="space-y-8">
+    <div className="mx-auto w-full max-w-[1600px] space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800">{t('Dashboard')}</h2>
@@ -114,7 +140,7 @@ function CatalogDashboard() {
       </div>
 
       {announcement && (
-        <div className="card p-4 border-blue-200 bg-blue-50/60 flex items-start gap-3">
+        <div className="card dashboard-card-enter flex items-start gap-3 border-blue-200 bg-blue-50/60 p-4">
           <Megaphone className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="min-w-0">
             {announcement.title && <p className="text-sm font-bold text-slate-800">{announcement.title}</p>}
@@ -133,8 +159,19 @@ function CatalogDashboard() {
         </div>
       )}
 
+      {dashboardQuery.isError && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          <span>{t('The dashboard could not be loaded.')}</span>
+          <button type="button" className="rounded-md border border-red-200 bg-white px-3 py-1.5 font-semibold hover:bg-red-50" onClick={() => dashboardQuery.refetch()}>{t('Retry')}</button>
+        </div>
+      )}
+
+      {loading ? <DashboardSkeleton showActivity={canSeeRecentActivity} /> : <>
+
       {/* KPI strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <section aria-labelledby="dashboard-summary" className="space-y-3">
+        <h3 id="dashboard-summary" className="sr-only">{t('Catalogue summary')}</h3>
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {pulse && (
           <>
             <Kpi
@@ -156,11 +193,12 @@ function CatalogDashboard() {
         />
         <Kpi label={t('active categories')} value={String(live.categories ?? '—')} />
       </div>
+      </section>
 
       {/* Needs attention — each number links to the pre-filtered list */}
-      <div className="space-y-2">
+      <section className="space-y-3">
         <h3 className="text-sm font-bold text-slate-800">{t('Needs your attention')}</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="dashboard-stagger grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <AttentionTile
             href="/dashboard/products?status=DRAFT"
             icon={FileEdit}
@@ -212,9 +250,9 @@ function CatalogDashboard() {
             unknownLabel={t('possible product families could not be checked')}
           />
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         {/* Latest orders */}
         {pulse && (
           <div className="space-y-2">
@@ -224,7 +262,7 @@ function CatalogDashboard() {
                 {t('view all')}
               </Link>
             </div>
-            <div className="card p-2">
+            <div className="card dashboard-card-enter min-h-36 p-2">
               {pulse.latest.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400">
                   {t('When your website receives orders, the newest appear here.')}
@@ -253,7 +291,7 @@ function CatalogDashboard() {
                 {t('view all')}
               </Link>
             </div>
-            <div className="card p-2">
+            <div className="card dashboard-card-enter min-h-36 p-2">
               {activity.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-400 flex flex-col items-center gap-2">
                   <Activity className="h-5 w-5" />
@@ -285,7 +323,7 @@ function CatalogDashboard() {
 
       {/* Website shortcuts */}
       {activeStores.length > 0 && (
-        <div className="card p-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+        <div className="card dashboard-card-enter flex flex-wrap items-center gap-x-6 gap-y-2 p-3 text-xs">
           <span className="font-semibold text-slate-500">{t('Your websites')}:</span>
           {activeStores.map((store) => (
             <span key={store.id} className="inline-flex items-center gap-1.5">
@@ -307,6 +345,7 @@ function CatalogDashboard() {
           ))}
         </div>
       )}
+      </>}
     </div>
   );
 }

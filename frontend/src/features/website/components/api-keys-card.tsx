@@ -160,8 +160,8 @@ export default function ApiKeysCard({
     );
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
+    <section className="dashboard-card-enter space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-bold text-slate-800">{t('API Access')}</h3>
           <Badge variant="info">{t('for the website')}</Badge>
@@ -172,19 +172,28 @@ export default function ApiKeysCard({
           </Button>
         )}
       </div>
-      <p className="text-xs text-slate-500">
+      <p className="max-w-5xl text-xs leading-5 text-slate-500">
         The website (and any integration) authenticates against the Catalogue API with one of these
         keys, sent as the <code className="bg-slate-100 px-1 rounded">X-Api-Key</code> header.
         Revoking a key cuts that consumer off immediately.
       </p>
 
-      {visibleKeys.length === 0 ? (
+      {keysQuery.isPending ? (
+        <div className="card space-y-3 p-4" role="status" aria-label={t('Loading API keys')}>
+          {[0, 1].map((row) => <div key={row} className="h-12 animate-pulse rounded-md bg-slate-100" />)}
+        </div>
+      ) : keysQuery.isError ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700" role="alert">
+          <span>{t('API keys could not be loaded.')}</span>
+          <Button size="sm" variant="secondary" onClick={() => keysQuery.refetch()}>{t('Retry')}</Button>
+        </div>
+      ) : visibleKeys.length === 0 ? (
         <EmptyState
           message={t('No API keys yet.')}
           hint={t('Create one and configure it on the website — the catalogue API requires it.')}
         />
       ) : (
-        <Table>
+        <Table wrapperProps={{ role: 'region', 'aria-label': t('API Access') }}>
           <THead>
             <TH>{t('Name')}</TH>
             <TH>{t('Store')}</TH>
@@ -328,6 +337,6 @@ export default function ApiKeysCard({
         onConfirm={handleRevoke}
         onCancel={() => setRevokeTarget(null)}
       />
-    </div>
+    </section>
   );
 }

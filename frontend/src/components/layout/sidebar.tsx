@@ -5,11 +5,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Building2,
-  ShoppingBag,
   LayoutDashboard,
   FolderTree,
   Package,
-  ArrowLeftRight,
   Boxes,
   Globe,
   UserCog,
@@ -62,6 +60,9 @@ interface NavItem {
   // Catalog work: hidden from the unscoped platform owner, whose sidebar
   // is business-only (they reach client catalogs via Clients → company)
   catalogWork?: boolean;
+  // Product modules that are implemented but intentionally not offered in
+  // this release. Keeping the routes intact lets us re-enable them safely.
+  temporarilyHidden?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -74,17 +75,17 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/platform-users', label: 'Platform Users', icon: UsersRound, adminOnly: true, unscopedOnly: true },
   { href: '/dashboard/website', label: 'Websites / Apps', icon: Globe },
   { href: '/dashboard/categories', label: 'Categories', icon: FolderTree, catalogWork: true },
-  { href: '/dashboard/products', label: 'Items', icon: Package, catalogWork: true },
+  { href: '/dashboard/products', label: 'Products', icon: Package, catalogWork: true },
   // Phase 8: the ledger finally has an operator surface. Gated by the same
   // capability the routes enforce — a branch admin reads its own branch, an
   // organization manager commands the whole company, editors and viewers
   // never see it because they cannot reach it.
   { href: '/dashboard/inventory', label: 'Inventory', icon: Boxes, catalogWork: true, capability: 'inventory', hideKey: 'INVENTORY' },
-  { href: '/dashboard/sales', label: 'Sales', icon: ShoppingBag, catalogWork: true },
+  { href: '/dashboard/sales', label: 'Sales', icon: CreditCard, catalogWork: true, temporarilyHidden: true },
   // P5-A2 family 4: the screen carries an organization-wide import workflow
   // and a read-only export, and EDITOR/VIEWER hold neither — the item had no
   // role gate at all, so they reached a page that refuses them.
-  { href: '/dashboard/import-export', label: 'Import / Export', icon: ArrowLeftRight, capability: 'importExport', hideKey: 'IMPORT_EXPORT', catalogWork: true },
+  { href: '/dashboard/import-export', label: 'Import / Export', icon: Package, capability: 'importExport', hideKey: 'IMPORT_EXPORT', catalogWork: true, temporarilyHidden: true },
   // P5-A2 family 6: staffing belongs to the manager too, so the nav follows the
   // shared capability instead of the SUPER_ADMIN|ADMIN guess.
   { href: '/dashboard/users', label: 'Team', icon: UserCog, capability: 'team' },
@@ -153,6 +154,7 @@ export default function Sidebar() {
 
   const items = NAV_ITEMS.filter(
     (item) =>
+      !item.temporarilyHidden &&
       capabilityAllows(item) &&
       (!item.adminOnly || isAdmin) &&
       // #290: `unscopedOnly` means UNSCOPED — which a platform owner stops
