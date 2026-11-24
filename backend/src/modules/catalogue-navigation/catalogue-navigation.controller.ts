@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -87,6 +87,17 @@ export class CatalogueNavigationController {
     const s = this.scope(req, requested);
     return this.service
       .addCategoryToNavigation(s.organizationId, s.storeId, channelId, categoryId)
+      .then((data) => ({ data }));
+  }
+  @Delete('channels/:channelId/navigation/groups/:groupId') removeNavigationGroup(
+    @Req() req: any,
+    @Param('storeId') requested: string,
+    @Param('channelId') channelId: string,
+    @Param('groupId') groupId: string,
+  ) {
+    const s = this.scope(req, requested);
+    return this.service
+      .removeNavigationGroup(s.organizationId, s.storeId, channelId, groupId)
       .then((data) => ({ data }));
   }
   @Put('channels/:channelId/categories/:categoryId') upsertPublication(

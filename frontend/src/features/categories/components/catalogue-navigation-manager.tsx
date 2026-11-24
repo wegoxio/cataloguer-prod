@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiFetch } from '../../../lib/api-client';
 import Button from '../../../components/ui/button';
 import Input from '../../../components/ui/input';
-import { ChevronDown, ChevronUp, GripVertical, RotateCcw, Save } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, RotateCcw, Save, Trash2 } from 'lucide-react';
 
 type Ref = string | { id: string };
 type Channel = { id: string; key: string; name: string; active: boolean; isDefault: boolean };
@@ -204,6 +204,15 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
       { method: 'POST', token },
     );
   });
+  const removeNavigationGroup = (group: Group) => {
+    const categoryNames = groupCategoryNames(group.id);
+    const label = categoryNames.length > 0 ? categoryNames.join(', ') : group.name;
+    if (!window.confirm(`¿Quitar “${label}” del menú de este canal? La categoría y sus productos no se eliminarán.`)) return;
+    void mutate(() => apiFetch(
+      `/stores/${storeId}/catalogue-navigation/channels/${channelId}/navigation/groups/${group.id}`,
+      { method: 'DELETE', token },
+    ));
+  };
   const saveDraftOrder = () => {
     const groupIds = orderedNavigationGroups.map((group) => group.id);
     void mutate(async () => {
@@ -258,7 +267,7 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
           <h4 className="text-sm font-semibold text-slate-800">Categorías del menú</h4>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <p className="mt-1 max-w-2xl text-xs text-slate-500">
-              Arrastra las categorías para ordenarlas y usa “Mostrar” para decidir si aparecen en este canal. Los cambios no se publican hasta que pulses Guardar configuración.
+              Arrastra las categorías para ordenarlas, usa “Mostrar” para ocultarlas temporalmente o “Quitar del menú” para retirarlas de este canal. Los cambios de orden y visibilidad se publican al pulsar Guardar configuración.
             </p>
             <div className="flex gap-2">
               <Button type="button" size="sm" variant="secondary" disabled={busy || !navigationConfigurationChanged} onClick={resetDraftOrder}>
@@ -314,6 +323,9 @@ export function CatalogueNavigationManager({ token, storeId }: { token: string; 
                   </button>
                   <button type="button" aria-label={`Bajar ${group.name}`} title="Mover abajo" disabled={busy || index === orderedNavigationGroups.length - 1} onClick={() => moveNavigationGroup(index, 1)} className="rounded border border-slate-200 p-1.5 text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30">
                     <ChevronDown className="h-4 w-4" />
+                  </button>
+                  <button type="button" aria-label={`Quitar ${group.name} del menú`} title="Quitar del menú" disabled={busy} onClick={() => removeNavigationGroup(group)} className="rounded border border-red-100 p-1.5 text-red-500 transition hover:border-red-300 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30">
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>

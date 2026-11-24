@@ -333,6 +333,36 @@ export class CatalogueNavigationService {
     return { groupId };
   }
 
+  async removeNavigationGroup(
+    organizationId: string,
+    storeId: string,
+    channelId: string,
+    groupId: string,
+  ) {
+    await this.channelIn(organizationId, storeId, channelId);
+    await this.em.transactional(async (em) => {
+      const group = await em.findOne(CatalogueGroup, {
+        id: groupId,
+        organization: organizationId,
+        store: storeId,
+        channel: channelId,
+        purpose: 'NAVIGATION',
+        active: true,
+      });
+      if (!group) throw new NotFoundException('Navigation group not found');
+
+      // Only the menu configuration is removed. The category, its products
+      // and its channel publication remain intact and can be added again.
+      await em.nativeDelete(CatalogueGroupCategory, {
+        organization: organizationId,
+        store: storeId,
+        group,
+      });
+      await em.removeAndFlush(group);
+    });
+    return this.snapshot(organizationId, storeId);
+  }
+
   async upsertPublication(
     organizationId: string,
     storeId: string,
