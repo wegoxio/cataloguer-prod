@@ -55,6 +55,7 @@ const PRODUCT_PARAMS = new Set([
   'mfgCode',
   'categorySlug',
   'inStock',
+  'hasStock',
   'channel',
   'group',
 ]);
@@ -280,6 +281,8 @@ export interface PublicProductsQuery {
   mfgCode?: string;
   categorySlug?: string;
   inStock?: boolean;
+  /** Strict physical availability: unlike inStock, untracked products do not qualify. */
+  hasStock?: boolean;
   specs?: Record<string, string[]>;
   channel?: string;
   group?: string;
@@ -322,6 +325,7 @@ export function parsePublicProductsQuery(query: Record<string, unknown>): Public
     mfgCode: term(query, 'mfgCode'),
     categorySlug: categorySlug(query),
     inStock: boolean(query, 'inStock'),
+    hasStock: boolean(query, 'hasStock'),
     specs: specFilters(query),
     channel: key(query, 'channel'),
     group: key(query, 'group'),

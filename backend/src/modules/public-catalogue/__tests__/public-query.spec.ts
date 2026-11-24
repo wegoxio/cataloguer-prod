@@ -94,6 +94,7 @@ describe('public query parsing (fail closed)', () => {
       ['hasSalePrice', 'yes'],
       ['hasSalePrice', 'TRUE'],
       ['hasSalePrice', '1'],
+      ['hasStock', 'yes'],
       ['sortDirection', 'up'],
       ['locale', 'not a locale'],
       ['locale', 'es_ES'],
@@ -109,6 +110,7 @@ describe('public query parsing (fail closed)', () => {
           mfgCode: 'FAB-123',
           categorySlug: 'sillas-oficina',
           inStock: 'true',
+          hasStock: 'true',
           'spec.material': 'Roble',
           'spec.ancho': ['90', '120'],
         }),
@@ -117,6 +119,7 @@ describe('public query parsing (fail closed)', () => {
         mfgCode: 'FAB-123',
         categorySlug: 'sillas-oficina',
         inStock: true,
+        hasStock: true,
         specs: { material: ['Roble'], ancho: ['90', '120'] },
       });
     });

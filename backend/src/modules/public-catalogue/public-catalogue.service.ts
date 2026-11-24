@@ -751,7 +751,12 @@ export class PublicCatalogueService {
    * table — measured at ~12 SECONDS for one listing at the 96k-product scale
    * (docs/evidence/183) before this predicate existed.
    */
-  private availabilityClause(inStock: boolean, storeId?: string, organizationId?: string): Record<string, any> {
+  private availabilityClause(
+    inStock: boolean,
+    storeId?: string,
+    organizationId?: string,
+    requirePositiveStock = false,
+  ): Record<string, any> {
     const tenant = organizationId ? ` and b.organization_id = ?` : '';
     const availability = storeId
       ? `coalesce((select sum(b.quantity)
@@ -781,7 +786,7 @@ export class PublicCatalogueService {
                and m.id = ${alias}.id)
            or (m.parent_id = ${alias}.id and m.status = 'PUBLISHED' and m.archived_at is null${childLink}))
          and m.removed_at is null
-         and (m.track_inventory = false or (${availability}) > 0))`;
+         and ${requirePositiveStock ? `(${availability}) > 0` : `(m.track_inventory = false or (${availability}) > 0)`})`;
     return inStock
       ? { [raw((alias) => sellableMemberExists(alias), params) as any]: true }
       : { [raw((alias) => `not ${sellableMemberExists(alias)}`, params) as any]: true };
@@ -923,6 +928,7 @@ export class PublicCatalogueService {
     categorySlug?: string;
     /** true = at least one purchasable member sellable now; false = none. */
     inStock?: boolean;
+    hasStock?: boolean;
     /** spec key → accepted values (values OR, keys AND). Unknown keys are 400s, resolved in specificationClauses. */
     specs?: Record<string, string[]>;
     /** Scopes results to a store's channel (from the API key, ADR 007) */
@@ -944,7 +950,7 @@ export class PublicCatalogueService {
     andClauses.splice(categoryClauseIndex >= 0 ? categoryClauseIndex : andClauses.length, 0, { parent: null });
 
     if (options) {
-      const { minPrice, maxPrice, hasSalePrice, search, mfgCode, categorySlug, inStock, specs, channel, group } =
+      const { minPrice, maxPrice, hasSalePrice, search, mfgCode, categorySlug, inStock, hasStock, specs, channel, group } =
         options;
 
       if (channel !== undefined) {
@@ -1026,6 +1032,9 @@ export class PublicCatalogueService {
       }
       if (inStock !== undefined) {
         andClauses.push(this.availabilityClause(inStock, options.storeId, options.organizationId));
+      }
+      if (hasStock !== undefined) {
+        andClauses.push(this.availabilityClause(hasStock, options.storeId, options.organizationId, true));
       }
       if (specs !== undefined) {
         andClauses.push(...(await this.specificationClauses(specs, options.storeId, options.organizationId)));
