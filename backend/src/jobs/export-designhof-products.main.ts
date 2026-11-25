@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import * as path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { MikroORM, EntityManager } from '@mikro-orm/postgresql';
-import ExcelJS from 'exceljs';
+import ExcelJS = require('exceljs');
 import { AppModule } from '../app.module';
 
 const ORGANIZATION = 'DesignHof';
