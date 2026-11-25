@@ -123,8 +123,9 @@ async function main(): Promise<void> {
       }
     });
 
+    const verificationPlaceholders = candidates.map(() => '?::uuid').join(', ');
     const verification: { total: number; ready: number; wrong: number }[] = await em.execute(
-      `with ids as (select unnest(?::uuid[]) id)
+      `with ids as (select id from products where id in (${verificationPlaceholders}))
        select count(*)::int total,
               count(*) filter (where p.status = 'PUBLISHED' and sp.published = true and sp.track_inventory = true
                 and coalesce((select sum(b.quantity) from inventory_balances b
@@ -136,7 +137,7 @@ async function main(): Promise<void> {
                                  and b.location_id = ?::uuid and b.operational_state = 'AVAILABLE'), 0) = ?))::int wrong
          from ids join products p on p.id = ids.id
          join store_products sp on sp.product_id = p.id and sp.store_id = ?::uuid`,
-      [candidates.map((p) => p.id), locationId, TARGET_STOCK, locationId, TARGET_STOCK, store.id],
+      [...candidates.map((p) => p.id), locationId, TARGET_STOCK, locationId, TARGET_STOCK, store.id],
     );
     if (verification[0].wrong !== 0 || verification[0].ready !== candidates.length) {
       throw new Error(`Verification failed: ${JSON.stringify(verification[0])}`);
