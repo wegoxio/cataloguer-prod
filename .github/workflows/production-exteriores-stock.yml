@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   exteriores:
-    runs-on: [self-hosted, cataloguer-pilot-prod]
+    runs-on: [self-hosted, Linux, X64, cataloguer-prod]
+    environment: production
     steps:
       - name: Locate healthy production backend
         shell: bash
