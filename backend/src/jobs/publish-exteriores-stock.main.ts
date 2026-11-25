@@ -60,7 +60,7 @@ async function main(): Promise<void> {
       `with recursive category_tree as (
          select id from categories where id = ?::uuid
          union all
-         select c.id from categories c join category_tree t on c.parent_id = t.id where c.archived_at is null
+         select c.id from categories c join category_tree t on c.parent_category_id = t.id where c.archived_at is null
        ), selected as (
          select distinct p.id
            from products p
