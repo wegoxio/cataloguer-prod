@@ -34,7 +34,8 @@ async function main(): Promise<void> {
     const em = orm.em.fork() as EntityManager;
 
     const organizations: { id: string }[] = await em.execute(
-      `select id from organizations where lower(name) = lower(?) and deleted_at is null`,
+      `select id from organizations
+        where lower(name) = lower(?) and archived_at is null and removed_at is null`,
       [ORGANIZATION],
     );
     if (organizations.length !== 1) throw new Error(`Expected one active ${ORGANIZATION} organization, found ${organizations.length}`);
